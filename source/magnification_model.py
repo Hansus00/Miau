@@ -90,7 +90,7 @@ def _fsbl_magnification(t, params):
     )
 
 
-def _negative_fb_prior(Fb, sigma=10.0):
+def _negative_flux_prior(Fb, sigma=10.0):
     return 0.5 * (jnp.maximum(-Fb, 0.0)) ** 2 / (sigma**2)
 
 
@@ -102,17 +102,21 @@ _MAGNIFICATION_FUNCS = {
     "fsbl": _fsbl_magnification,
 }
 
+
 def _prior_parallax(params):
     return 0.5 * (params["pi_E_N"] ** 2 + params["pi_E_E"] ** 2) / (0.15**2)
+
 
 def _prior_bspl(params):
     prior = 0.5 * (params["q_f"] - 1.0) ** 2 / (10.0**2)
     return prior + 0.5 * (jnp.maximum(-params["q_f"], 0.0)) ** 2 / (3.0**2)
 
+
 _PRIOR_FUNCS = {
     "parallax": _prior_parallax,
     "bspl": _prior_bspl,
 }
+
 
 def magnification(t, params):
     model = params.get("model")
@@ -123,9 +127,12 @@ def magnification(t, params):
 
 def neg_lnprob(t, params, mag, mag_err):
     A = magnification(t, params)
-    _, _, Fb, _, chi2 = linear_chi2(A, mag, mag_err)
+    Fs, _, Fb, _, chi2 = linear_chi2(A, mag, mag_err)
 
-    prior_term = _negative_fb_prior(Fb)
+    prior_fb = _negative_flux_prior(Fb)
+    prior_fs = _negative_flux_prior(Fs)
+    prior_term = prior_fs + prior_fb
+
     model = params.get("model")
 
     prior_fn = _PRIOR_FUNCS.get(model)
