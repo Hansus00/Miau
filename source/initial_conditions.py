@@ -1,6 +1,7 @@
 import numpy as np
 
 import jax
+
 jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 
@@ -49,7 +50,9 @@ class InitialConditions:
         """Returns data augmented with initial conditions."""
         processed = self.data.copy()
         processed["t_0_shift"] = jnp.asarray(self.t_0_shift, dtype=jnp.float64)
-        processed["start_boundary"] = jnp.asarray(self.start_boundary, dtype=jnp.float64)
+        processed["start_boundary"] = jnp.asarray(
+            self.start_boundary, dtype=jnp.float64
+        )
         processed["end_boundary"] = jnp.asarray(self.end_boundary, dtype=jnp.float64)
         processed["baseline"] = jnp.asarray(self.baseline, dtype=jnp.float64)
         return processed
@@ -64,7 +67,9 @@ class InitialConditions:
         }
 
         if model_name not in init_methods:
-            raise ValueError(f"Unknown model: {model_name}. Available models: {list(init_methods.keys())}")
+            raise ValueError(
+                f"Unknown model: {model_name}. Available models: {list(init_methods.keys())}"
+            )
 
         return init_methods[model_name](prev_results)
 

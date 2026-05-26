@@ -1,6 +1,7 @@
 import os
 
 import jax
+
 jax.config.update("jax_enable_x64", True)
 
 from data_loader import DataLoader

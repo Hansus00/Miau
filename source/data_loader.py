@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 
 import jax
+
 jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 
@@ -42,7 +43,9 @@ class DataLoader:
             for alt_filter in self.filters:
                 alt_file = file_path.replace("F146", alt_filter)
                 if os.path.exists(alt_file) and os.path.getsize(alt_file) > 0:
-                    df = pd.read_csv(alt_file, header=None, names=["bjd", "mag", "mag_err"])
+                    df = pd.read_csv(
+                        alt_file, header=None, names=["bjd", "mag", "mag_err"]
+                    )
                     if len(df) != 0:
                         break
             else:
@@ -50,7 +53,7 @@ class DataLoader:
                     f"No valid data found in filters {self.filters} for {file_path}"
                 )
 
-        flux = 10 ** (-0.4 * (df["mag"].values - 22)) # type: ignore
+        flux = 10 ** (-0.4 * (df["mag"].values - 22))  # type: ignore
         flux_err = flux * (0.4 * np.log(10.0)) * df["mag_err"].values
         JD = df["bjd"].values
 
