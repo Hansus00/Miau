@@ -46,13 +46,36 @@ class InitialConditions:
 
         return baseline, main_peak_time, t[start_idx], t[end_idx]
 
-    def get_processed_data(self):
-        """Returns data augmented with initial conditions."""
-        processed = self.data.copy()
-        processed["t_0_shift"] = jnp.asarray(self.t_0_shift, dtype=jnp.float64)
-        processed["start_boundary"] = jnp.asarray(
-            self.start_boundary, dtype=jnp.float64
+    def get_processed_data(self, max_len):
+        """Returns data augmented with initial conditions and padded to max_len."""
+        mask = (self.data["t"] >= self.start_boundary) & (
+            self.data["t"] <= self.end_boundary
         )
+
+        valid_t = self.data["t"][mask]
+        valid_mag = self.data["mag"][mask]
+        valid_mag_err = self.data["mag_err"][mask]
+
+        n_valid = len(valid_t)
+        if n_valid > max_len:
+            raise ValueError(f"Event has {n_valid} points, exceeding max_len={max_len}.")
+
+        pad_width = max_len - n_valid
+
+        # Pad t with the last value, mag with 0.
+        t_pad_val = valid_t[-1] if n_valid > 0 else 0.0
+        t_padded = jnp.pad(valid_t, (0, pad_width), constant_values=t_pad_val)
+        mag_padded = jnp.pad(valid_mag, (0, pad_width), constant_values=0.0)
+        mag_err_padded = jnp.pad(valid_mag_err, (0, pad_width), constant_values=jnp.inf)
+
+        processed = self.data.copy()
+        processed["t"] = t_padded
+        processed["mag"] = mag_padded
+        processed["mag_err"] = mag_err_padded
+        processed["n_valid"] = jnp.asarray(n_valid, dtype=jnp.int32)
+
+        processed["t_0_shift"] = jnp.asarray(self.t_0_shift, dtype=jnp.float64)
+        processed["start_boundary"] = jnp.asarray(self.start_boundary, dtype=jnp.float64)
         processed["end_boundary"] = jnp.asarray(self.end_boundary, dtype=jnp.float64)
         processed["baseline"] = jnp.asarray(self.baseline, dtype=jnp.float64)
         return processed
