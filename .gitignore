@@ -4,3 +4,4 @@ data/*.parquet
 .venv/
 results/
 **/__pycache__
+.so

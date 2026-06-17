@@ -3,6 +3,8 @@ import jax
 jax.config.update("jax_enable_x64", True)
 
 import jax.numpy as jnp
+import numpy as np
+import twinkle
 from microjax.likelihood import linear_chi2
 from microjax.trajectory import (
     set_parallax_ephem,
@@ -17,6 +19,8 @@ _ephemeris_table = load_horizons_vectors_file("data/Roman_ephemeris_jax.txt")
 # _ephemeris_table = load_horizons_vectors_file("data/earth_orbital_parallax_table.txt")
 _eph_object = HeliocentricEphemeris.from_horizons_vectors_table(_ephemeris_table)
 _fspl_obj = fspl_disk()
+_twinkle_obj = None
+_twinkle_n_srcs = 0
 
 
 def _pspl_magnification(t, params):
@@ -90,8 +94,32 @@ def _fsbl_magnification(t, params):
     )
 
 
-def _negative_flux_prior(Fb, sigma=10.0):
-    return 0.5 * (jnp.maximum(-Fb, 0.0)) ** 2 / (sigma**2)
+def _create_twinkle_obj(n_srcs, device_num=0, n_stream=1, RelTol=1e-4):
+    global _twinkle_obj, _twinkle_n_srcs
+    _twinkle_obj = twinkle.Twinkle(n_srcs, device_num, n_stream, RelTol)
+    _twinkle_n_srcs = n_srcs
+
+
+def _fsbl_grid_magnification(t, params):
+    tau = (t - params["t_0"]) / params["t_E"]
+    n_srcs = len(t)
+    u_vec = params["u_0"] * np.ones(n_srcs)
+    sin_alpha = np.sin(np.radians(params["alpha_deg"]))
+    cos_alpha = np.cos(np.radians(params["alpha_deg"]))
+    x = (
+        -tau * cos_alpha + u_vec * sin_alpha
+    )  # alpha sign convention same as in MulensModel
+    y = -tau * sin_alpha - u_vec * cos_alpha
+
+    if _twinkle_obj is None or _twinkle_n_srcs != n_srcs:
+        _create_twinkle_obj(n_srcs)
+
+    mag = np.empty(n_srcs)
+    _twinkle_obj.set_params(params["s"], params["q"], params["rho"], x, y)
+    _twinkle_obj.run()
+    _twinkle_obj.return_mag_to(mag)
+
+    return mag
 
 
 _MAGNIFICATION_FUNCS = {
@@ -100,7 +128,12 @@ _MAGNIFICATION_FUNCS = {
     "fspl": _fspl_magnification,
     "bspl": _bspl_magnification,
     "fsbl": _fsbl_magnification,
+    "fsbl_grid": _fsbl_grid_magnification,
 }
+
+
+def _negative_flux_prior(Fb, sigma=10.0):
+    return 0.5 * (jnp.maximum(-Fb, 0.0)) ** 2 / (sigma**2)
 
 
 def _prior_parallax(params):
