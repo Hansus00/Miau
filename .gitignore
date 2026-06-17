@@ -5,3 +5,4 @@ data/*.parquet
 results/
 **/__pycache__
 .so
+*/*.so
