@@ -19,9 +19,8 @@ def main():
     ]
 
     data_loader = DataLoader(coord_file="data/coords.csv")
-    # models = [PSPL(), Parallax(), BSPL(), FSBL()]
     models = [PSPL(), Parallax(), BSPL()]
-    run_pipeline(files, out_dir, data_loader, models)
+    run_pipeline(files, out_dir, data_loader, models, max_len=46_208)
 
 
 if __name__ == "__main__":

@@ -132,3 +132,25 @@ class FSBL(ModelBase):
             "rho": jnp.exp(params[5]),
             "alpha_deg": params[6],
         }
+
+class FSBLGrid(ModelBase):
+    """
+    Finite Source Binary Lens initial grid search model.
+    No reparametrization other than t_0_shift.
+    """
+
+    def __init__(self):
+        super().__init__("FSBLGrid", ["t_0", "t_E", "u_0", "s", "q", "rho", "alpha_deg"])
+
+    def to_dict(self, params, data):
+        return {
+            "model": "fsbl_grid",
+            "t_0": params[0] + data["t_0_shift"],
+            "t_E": params[1],
+            "u_0": params[2],
+            "s": params[3],
+            "q": params[4],
+            "rho": params[5],
+            "alpha_deg": params[6],
+        }
+
