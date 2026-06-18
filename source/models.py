@@ -3,7 +3,7 @@ import jax
 jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 
-from magnification_model import neg_lnprob
+from magnification_model import magnification, neg_lnprob
 
 
 class ModelBase:
@@ -78,6 +78,20 @@ class Parallax(ModelBase):
         }
 
 
+def _bspl_second_peak_time(t, mag, n_valid, t_0, t_E, u_0, Fs, Fb):
+    """
+    helper meant to be jax.vmap'd over a batch axis
+    """
+    A_pspl = magnification(t, {"model": "pspl", "t_0": t_0, "t_E": t_E, "u_0": u_0})
+    model_flux = Fs * A_pspl + Fb
+    residual = mag - model_flux
+
+    valid = jnp.arange(t.shape[0]) < n_valid
+    masked_residual = jnp.where(valid, residual, -jnp.inf)
+    top_idx = jnp.argsort(masked_residual)[-10:]
+    return jnp.mean(t[top_idx])
+
+
 class BSPL(ModelBase):
     """
     Binary Source Point Lens Model.
@@ -92,6 +106,23 @@ class BSPL(ModelBase):
 
     def __init__(self):
         super().__init__("BSPL", ["t_0_1", "t_0_2", "t_E", "u_0_1", "u_0_2", "q_f"])
+
+    def setup_data(self, data, prev_results):
+        pspl_dict = prev_results["PSPL"]["dict"]
+        Fs = prev_results["PSPL"]["Fs"]
+        Fb = prev_results["PSPL"]["Fb"]
+
+        data["t_0_2_guess"] = jax.vmap(_bspl_second_peak_time)(
+            data["t"],
+            data["mag"],
+            data["n_valid"],
+            pspl_dict["t_0"],
+            pspl_dict["t_E"],
+            pspl_dict["u_0"],
+            Fs,
+            Fb,
+        )
+        return data
 
     def to_dict(self, params, data):
         return {
@@ -133,6 +164,7 @@ class FSBL(ModelBase):
             "alpha_deg": params[6],
         }
 
+
 class FSBLGrid(ModelBase):
     """
     Finite Source Binary Lens initial grid search model.
@@ -140,7 +172,9 @@ class FSBLGrid(ModelBase):
     """
 
     def __init__(self):
-        super().__init__("FSBLGrid", ["t_0", "t_E", "u_0", "s", "q", "rho", "alpha_deg"])
+        super().__init__(
+            "FSBLGrid", ["t_0", "t_E", "u_0", "s", "q", "rho", "alpha_deg"]
+        )
 
     def to_dict(self, params, data):
         return {
@@ -153,4 +187,3 @@ class FSBLGrid(ModelBase):
             "rho": params[5],
             "alpha_deg": params[6],
         }
-

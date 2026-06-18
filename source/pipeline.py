@@ -79,7 +79,10 @@ def run_pipeline(files, out_dir, data_loader, models, max_len):
                 pm: {"raw_params": prev_results[pm]["raw_params"][i]}
                 for pm in prev_results
             }
-            p = event_objects[i].get_model_init_params(m.name, single_prev)
+            single_data_for_init = {k: v[i] for k, v in batched_data.items()}
+            p = event_objects[i].get_model_init_params(
+                m.name, single_prev, single_data_for_init
+            )
             batched_init_params.append(p)
         batched_init_params = jnp.stack(batched_init_params)
 
@@ -87,6 +90,7 @@ def run_pipeline(files, out_dir, data_loader, models, max_len):
         batched_opt_params = res["params"]
 
         batched_dict_lists = defaultdict(list)
+        Fs_list, Fb_list = [], []
         for i in range(num_events):
             single_data = {k: v[i] for k, v in batched_data.items()}
             single_params = batched_opt_params[i]
@@ -107,6 +111,8 @@ def run_pipeline(files, out_dir, data_loader, models, max_len):
             }
             for k, v in p_dict.items():
                 batched_dict_lists[k].append(v)
+            Fs_list.append(Fs)
+            Fb_list.append(Fb)
 
         prev_results[m.name] = {
             "raw_params": batched_opt_params,
@@ -114,6 +120,8 @@ def run_pipeline(files, out_dir, data_loader, models, max_len):
                 k: (jnp.stack(v) if isinstance(v[0], (jnp.ndarray, float, int)) else v)
                 for k, v in batched_dict_lists.items()
             },
+            "Fs": jnp.stack(Fs_list),
+            "Fb": jnp.stack(Fb_list),
         }
 
     for i, file in enumerate(valid_files):

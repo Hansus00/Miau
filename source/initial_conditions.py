@@ -58,7 +58,9 @@ class InitialConditions:
 
         n_valid = len(valid_t)
         if n_valid > max_len:
-            raise ValueError(f"Event has {n_valid} points, exceeding max_len={max_len}.")
+            raise ValueError(
+                f"Event has {n_valid} points, exceeding max_len={max_len}."
+            )
 
         pad_width = max_len - n_valid
 
@@ -75,13 +77,17 @@ class InitialConditions:
         processed["n_valid"] = jnp.asarray(n_valid, dtype=jnp.int32)
 
         processed["t_0_shift"] = jnp.asarray(self.t_0_shift, dtype=jnp.float64)
-        processed["start_boundary"] = jnp.asarray(self.start_boundary, dtype=jnp.float64)
+        processed["start_boundary"] = jnp.asarray(
+            self.start_boundary, dtype=jnp.float64
+        )
         processed["end_boundary"] = jnp.asarray(self.end_boundary, dtype=jnp.float64)
         processed["baseline"] = jnp.asarray(self.baseline, dtype=jnp.float64)
         return processed
 
-    def get_model_init_params(self, model_name, prev_results):
-        """Returns the initial parameters for a given model."""
+    def get_model_init_params(self, model_name, prev_results, data=None):
+        """
+        Returns the initial parameters for a given model.
+        """
         init_methods = {
             "PSPL": self._init_pspl,
             "PSPL+Parallax": self._init_pspl_parallax,
@@ -94,20 +100,31 @@ class InitialConditions:
                 f"Unknown model: {model_name}. Available models: {list(init_methods.keys())}"
             )
 
-        return init_methods[model_name](prev_results)
+        return init_methods[model_name](prev_results, data)
 
-    def _init_pspl(self, prev_results):
+    def _init_pspl(self, prev_results, data=None):
         return jnp.array([0.0, jnp.log(20.0), 0.1], dtype=jnp.float64)
 
-    def _init_pspl_parallax(self, prev_results):
+    def _init_pspl_parallax(self, prev_results, data=None):
         pspl = prev_results["PSPL"]["raw_params"]
         return jnp.concatenate([pspl, jnp.array([0.0, 0.0], dtype=jnp.float64)])
 
-    def _init_bspl(self, prev_results):
+    def _init_bspl(self, prev_results, data=None):
         pspl = prev_results["PSPL"]["raw_params"]
-        return jnp.array([0.0, 0.0, pspl[1], pspl[2], pspl[2], -1.0], dtype=jnp.float64)
 
-    def _init_fsbl(self, prev_results):
+        t_0_1_init = pspl[0]
+
+        if data is not None and "t_0_2_guess" in data:
+            t_0_2_init = data["t_0_2_guess"] - data["t_0_shift"]
+        else:
+            t_0_2_init = 0.0
+
+        return jnp.array(
+            [t_0_1_init, t_0_2_init, pspl[1], pspl[2], pspl[2], -1.0],
+            dtype=jnp.float64,
+        )
+
+    def _init_fsbl(self, prev_results, data=None):
         pspl = prev_results["PSPL"]["raw_params"]
         return jnp.concatenate(
             [
