@@ -1,106 +1,190 @@
+from __future__ import annotations
+
 import jax
 
 jax.config.update("jax_enable_x64", True)
 
 import jax.numpy as jnp
 from microjax.likelihood import linear_chi2
-from microjax.trajectory import (
-    set_parallax_ephem,
-    compute_parallax_ephem,
-    load_horizons_vectors_file,
-    HeliocentricEphemeris,
-)
-from microlux import binary_mag
-from fastlens.mag_fft_jax import fspl_disk
 
-_ephemeris_table = load_horizons_vectors_file("data/Roman_ephemeris_jax.txt")
-# _ephemeris_table = load_horizons_vectors_file("data/earth_orbital_parallax_table.txt")
-_eph_object = HeliocentricEphemeris.from_horizons_vectors_table(_ephemeris_table)
-_fspl_obj = fspl_disk()
+from binary_lens import fsbl_magnification_microjax_jit, soft_box_penalty
+
+# Parallax imports are intentionally lazy. Non-parallax models must not fail at
+# import time just because Roman_ephemeris_jax.txt is not present.
+#
+# Important compatibility note:
+#   microjaxx==0.1.1 exposes the public API set_parallax()/compute_parallax().
+#   Newer development versions may also expose set_parallax_ephem()/
+#   compute_parallax_ephem() plus HeliocentricEphemeris.  The fitting code below
+#   supports both.  If the ephemeris API or Roman ephemeris file is unavailable,
+#   it falls back to the Keplerian annual-parallax approximation instead of
+#   crashing.
+_EPH_OBJECT = None
+_EPH_LOAD_ERROR = None
+
+
+def _to_jd_minus_2450000(t):
+    """Accept either absolute JD/BJD or JD-2450000 and return JD-2450000."""
+    return jnp.where(t > 2_450_000.0, t - 2_450_000.0, t)
+
+
+def _load_ephemeris():
+    """Load Roman/JPL-Horizons ephemeris if the installed microJAX supports it."""
+    global _EPH_OBJECT, _EPH_LOAD_ERROR
+    if _EPH_OBJECT is not None:
+        return _EPH_OBJECT
+    if _EPH_LOAD_ERROR is not None:
+        raise _EPH_LOAD_ERROR
+
+    try:
+        from microjax.trajectory import (
+            HeliocentricEphemeris,
+            load_horizons_vectors_file,
+        )
+
+        table = load_horizons_vectors_file("data/Roman_ephemeris_jax.txt")
+        _EPH_OBJECT = HeliocentricEphemeris.from_horizons_vectors_table(table)
+        return _EPH_OBJECT
+    except Exception as exc:  # pragma: no cover - depends on package version/file
+        _EPH_LOAD_ERROR = exc
+        raise
+
+
+def _parallax_offsets(t, params):
+    """Return d_tau, d_beta for parallax.
+
+    Preference order:
+      1. ephemeris-based parallax, if the installed microJAX version exposes
+         set_parallax_ephem()/compute_parallax_ephem() and
+         data/Roman_ephemeris_jax.txt is present;
+      2. public microjaxx==0.1.1 annual-parallax API:
+         set_parallax()/compute_parallax().
+
+    The fallback is still physically meaningful annual parallax, but it is not a
+    Roman-spacecraft ephemeris correction.  Use a newer microJAX development
+    install plus the Roman Horizons file if you specifically need the spacecraft
+    ephemeris version.
+    """
+    t_rel = _to_jd_minus_2450000(t)
+    t_ref = _to_jd_minus_2450000(params["t_0_par"])
+    ra = params["coords"][0]
+    dec = params["coords"][1]
+
+    # Newer microJAX development API: ephemeris-driven parallax.
+    try:
+        from microjax.trajectory import set_parallax_ephem, compute_parallax_ephem
+
+        eph_object = _load_ephemeris()
+        proj = set_parallax_ephem(tref=t_ref, RA=ra, Dec=dec, eph=eph_object)
+        return compute_parallax_ephem(
+            t_rel, params["pi_E_N"], params["pi_E_E"], proj
+        )
+    except Exception:
+        # microjaxx==0.1.1 public API: Keplerian annual parallax.
+        from microjax.trajectory import set_parallax, compute_parallax
+
+        parallax_params = set_parallax(
+            tref=t_ref,
+            tperi=0.0,
+            tvernal=0.0,
+            RA=ra,
+            Dec=dec,
+        )
+        return compute_parallax(
+            t_rel, params["pi_E_N"], params["pi_E_E"], parallax_params
+        )
+
+
+def _pspl_from_tau_beta(tau, beta):
+    u = jnp.sqrt(beta**2 + tau**2)
+    return (u**2 + 2.0) / (u * jnp.sqrt(u**2 + 4.0))
 
 
 def _pspl_magnification(t, params):
     tau = (t - params["t_0"]) / params["t_E"]
-    u = jnp.sqrt(params["u_0"] ** 2 + tau**2)
-    return (u**2 + 2) / (u * jnp.sqrt(u**2 + 4))
-
-
-def _fspl_magnification(t, params):
-    tau = (t - params["t_0"]) / params["t_E"]
-    u = jnp.sqrt(params["u_0"] ** 2 + tau**2)
-    return _fspl_obj.A(u, params["rho"])
+    return _pspl_from_tau_beta(tau, params["u_0"])
 
 
 def _parallax_magnification(t, params):
     tau = (t - params["t_0"]) / params["t_E"]
-    t_ephem = t - 2_450_000.0
-    t_0_par_ephem = params["t_0_par"] - 2_450_000.0
-    proj = set_parallax_ephem(
-        tref=t_0_par_ephem,
-        RA=params["coords"][0],
-        Dec=params["coords"][1],
-        eph=_eph_object,
-    )
-    d_tau, d_beta = compute_parallax_ephem(
-        t_ephem, params["pi_E_N"], params["pi_E_E"], proj
-    )
-
-    tau += d_tau
-    u_0 = params["u_0"] + d_beta
-    u = jnp.sqrt(u_0**2 + tau**2)
-    return (u**2 + 2) / (u * jnp.sqrt(u**2 + 4))
+    d_tau, d_beta = _parallax_offsets(t, params)
+    return _pspl_from_tau_beta(tau + d_tau, params["u_0"] + d_beta)
 
 
 def _bspl_magnification(t, params):
     tau_1 = (t - params["t_0_1"]) / params["t_E"]
     tau_2 = (t - params["t_0_2"]) / params["t_E"]
-    u_1 = jnp.sqrt(params["u_0_1"] ** 2 + tau_1**2)
-    u_2 = jnp.sqrt(params["u_0_2"] ** 2 + tau_2**2)
-    A_1 = (u_1**2 + 2) / (u_1 * jnp.sqrt(u_1**2 + 4))
-    A_2 = (u_2**2 + 2) / (u_2 * jnp.sqrt(u_2**2 + 4))
-    return (A_1 + params["q_f"] * A_2) / (1 + params["q_f"])
+    A_1 = _pspl_from_tau_beta(tau_1, params["u_0_1"])
+    A_2 = _pspl_from_tau_beta(tau_2, params["u_0_2"])
+    return (A_1 + params["q_f"] * A_2) / (1.0 + params["q_f"])
 
 
-def _fsbl_magnification_core(t, t_0, u_0, t_E, rho, q, s, alpha_deg):
-    return binary_mag(
-        t_0,
-        u_0,
-        t_E,
-        rho,
-        q,
-        s,
-        alpha_deg,
-        t,
-    )
+def _bspl_parallax_magnification(t, params):
+    """
+    Binary-source point-lens model with parallax.
 
-
-_fsbl_magnification_core = jax.jit(_fsbl_magnification_core, backend="cpu")
+    The same observer-induced displacement is applied to both source components.
+    This is the natural 1L2S extension when both sources share the same lens and
+    the same relative proper-motion frame.
+    """
+    d_tau, d_beta = _parallax_offsets(t, params)
+    tau_1 = (t - params["t_0_1"]) / params["t_E"] + d_tau
+    tau_2 = (t - params["t_0_2"]) / params["t_E"] + d_tau
+    A_1 = _pspl_from_tau_beta(tau_1, params["u_0_1"] + d_beta)
+    A_2 = _pspl_from_tau_beta(tau_2, params["u_0_2"] + d_beta)
+    return (A_1 + params["q_f"] * A_2) / (1.0 + params["q_f"])
 
 
 def _fsbl_magnification(t, params):
-    return _fsbl_magnification_core(
+    """Finite-source binary-lens magnification with microJAX."""
+    return fsbl_magnification_microjax_jit(
         t,
         params["t_0"],
         params["u_0"],
         params["t_E"],
         params["rho"],
-        params["q"],
         params["s"],
+        params["q"],
         params["alpha_deg"],
     )
 
 
-def _negative_flux_prior(Fb, sigma=10.0):
-    return 0.5 * (jnp.maximum(-Fb, 0.0)) ** 2 / (sigma**2)
+def _fsbl_parallax_magnification(t, params):
+    """
+    Finite-source binary-lens model with parallax.
+
+    We compute the standard parallax offsets d_tau and d_beta, then pass them
+    into the same binary-lens trajectory builder used by FSBL.  Inside
+    ``binary_lens.rectilinear_trajectory`` the perturbed coordinates are rotated
+    into the binary-lens frame by alpha_deg.
+    """
+    d_tau, d_beta = _parallax_offsets(t, params)
+    return fsbl_magnification_microjax_jit(
+        t,
+        params["t_0"],
+        params["u_0"],
+        params["t_E"],
+        params["rho"],
+        params["s"],
+        params["q"],
+        params["alpha_deg"],
+        d_tau,
+        d_beta,
+    )
 
 
 _MAGNIFICATION_FUNCS = {
     "pspl": _pspl_magnification,
     "parallax": _parallax_magnification,
-    "fspl": _fspl_magnification,
     "bspl": _bspl_magnification,
+    "bspl_parallax": _bspl_parallax_magnification,
     "fsbl": _fsbl_magnification,
+    "fsbl_parallax": _fsbl_parallax_magnification,
 }
+
+
+def _negative_flux_prior(F, sigma=10.0):
+    return 0.5 * (jnp.maximum(-F, 0.0) / sigma) ** 2
 
 
 def _prior_parallax(params):
@@ -109,12 +193,45 @@ def _prior_parallax(params):
 
 def _prior_bspl(params):
     prior = 0.5 * (params["q_f"] - 1.0) ** 2 / (10.0**2)
-    return prior + 0.5 * (jnp.maximum(-params["q_f"], 0.0)) ** 2 / (3.0**2)
+    return prior + 0.5 * (jnp.maximum(-params["q_f"], 0.0) / 3.0) ** 2
+
+
+def _prior_fsbl(params):
+    """
+    Weak numerical guardrails for blind FSBL optimization.
+
+    These are deliberately broad; they do not encode a strong astrophysical
+    population prior. They mainly keep gradient descent away from regions where
+    the finite-source binary-lens call is uninformative or extremely slow.
+    """
+    log_s = jnp.log(params["s"])
+    log_q = jnp.log(params["q"])
+    log_rho = jnp.log(params["rho"])
+    log_tE = jnp.log(params["t_E"])
+
+    return (
+        soft_box_penalty(log_s, jnp.log(0.05), jnp.log(20.0), 0.25)
+        + soft_box_penalty(log_q, jnp.log(1.0e-6), jnp.log(1.0), 0.35)
+        + soft_box_penalty(log_rho, jnp.log(1.0e-5), jnp.log(0.2), 0.35)
+        + soft_box_penalty(log_tE, jnp.log(0.05), jnp.log(2000.0), 0.5)
+        + soft_box_penalty(jnp.abs(params["u_0"]), 0.0, 5.0, 0.5)
+    )
+
+
+def _prior_bspl_parallax(params):
+    return _prior_bspl(params) + _prior_parallax(params)
+
+
+def _prior_fsbl_parallax(params):
+    return _prior_fsbl(params) + _prior_parallax(params)
 
 
 _PRIOR_FUNCS = {
     "parallax": _prior_parallax,
     "bspl": _prior_bspl,
+    "bspl_parallax": _prior_bspl_parallax,
+    "fsbl": _prior_fsbl,
+    "fsbl_parallax": _prior_fsbl_parallax,
 }
 
 
@@ -125,18 +242,14 @@ def magnification(t, params):
     return _MAGNIFICATION_FUNCS[model](t, params)
 
 
-def neg_lnprob(t, params, mag, mag_err):
+def neg_lnprob(t, params, flux, flux_err):
     A = magnification(t, params)
-    Fs, _, Fb, _, chi2 = linear_chi2(A, mag, mag_err)
+    Fs, _, Fb, _, chi2 = linear_chi2(A, flux, flux_err)
 
-    prior_fb = _negative_flux_prior(Fb)
-    prior_fs = _negative_flux_prior(Fs)
-    prior_term = prior_fs + prior_fb
+    prior_term = _negative_flux_prior(Fs) + _negative_flux_prior(Fb)
 
-    model = params.get("model")
-
-    prior_fn = _PRIOR_FUNCS.get(model)
+    prior_fn = _PRIOR_FUNCS.get(params.get("model"))
     if prior_fn is not None:
-        prior_term += prior_fn(params)
+        prior_term = prior_term + prior_fn(params)
 
     return 0.5 * chi2 + prior_term

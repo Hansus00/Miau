@@ -3,4 +3,5 @@ numpy>=2.3.3
 jax==0.7.2
 optax==0.2.6
 microjaxx==0.1.1
-microlux==0.2.0
+# Optional now. The main FSBL backend is microJAX, not microlux/Twinkle.
+# microlux==0.2.0
