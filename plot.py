@@ -373,10 +373,10 @@ def plot_event_fit(
 ):
     t = lc["t"]
 
-    t_min = float(np.nanmin(t))
-    t_max = float(np.nanmax(t))
-    pad = 0.03 * (t_max - t_min) if t_max > t_min else 1.0
-    t_grid = np.linspace(t_min - pad, t_max + pad, n_grid)
+    # Use exactly the observed data times for model evaluation.
+    # This is faster and avoids drawing an artificial smooth curve,
+    # especially important for FSBL/microJAX.
+    t_model = t.copy()
 
     if show_residuals:
         fig, (ax, ax_res) = plt.subplots(
@@ -417,7 +417,7 @@ def plot_event_fit(
         )
         ax.set_ylabel("Flux, ZP=22")
 
-    # Plot models.
+    # Plot models at exactly the data time points.
     for model_name in models_to_plot:
         if model_name not in params_by_model:
             print(f"Skipping {model_name}: not found in params file.")
@@ -426,62 +426,56 @@ def plot_event_fit(
         section = params_by_model[model_name]
 
         try:
-            model_flux_grid = evaluate_model_flux(t_grid, model_name, section)
+            model_flux_data = evaluate_model_flux(t_model, model_name, section)
         except Exception as exc:
-            print(f"Skipping {model_name}: could not evaluate model on grid: {exc}")
+            print(f"Skipping {model_name}: could not evaluate model: {exc}")
             continue
 
         if y_mode == "mag":
-            y_grid = flux_to_mag(model_flux_grid)
+            y_model = flux_to_mag(model_flux_data)
         else:
-            y_grid = model_flux_grid
+            y_model = model_flux_data
 
         chi2 = section.get("Chi2", np.nan)
         chi2dof = section.get("chi2/dof", np.nan)
+
         label = f"{model_name}"
         if np.isfinite(chi2dof):
             label += f"  χ²/dof={chi2dof:.3g}"
 
-        ax.plot(t_grid, y_grid, lw=2.0, label=label)
+        # Sort by time before plotting the line.
+        order = np.argsort(t_model)
+        ax.plot(
+            t_model[order],
+            y_model[order],
+            lw=1.8,
+            marker=".",
+            ms=2,
+            alpha=0.9,
+            label=label,
+        )
 
         if show_residuals and ax_res is not None:
-            try:
-                model_flux_data = evaluate_model_flux(lc["t"], model_name, section)
+            if y_mode == "mag":
+                residual = lc["mag"] - y_model
+                residual_err = lc["mag_err"]
+                ax_res.set_ylabel("Data - model [mag]")
+            else:
+                residual = lc["flux"] - y_model
+                residual_err = lc["flux_err"]
+                ax_res.set_ylabel("Data - model [flux]")
 
-                if y_mode == "mag":
-                    model_y_data = flux_to_mag(model_flux_data)
-                    residual = lc["mag"] - model_y_data
-                    residual_err = lc["mag_err"]
-                    ax_res.set_ylabel("Data - model [mag]")
-                    ax_res.axhline(0.0, lw=1)
-                    ax_res.errorbar(
-                        lc["t"],
-                        residual,
-                        yerr=residual_err,
-                        fmt=".",
-                        ms=3,
-                        alpha=0.45,
-                        capsize=0,
-                        label=model_name,
-                    )
-                else:
-                    residual = lc["flux"] - model_flux_data
-                    residual_err = lc["flux_err"]
-                    ax_res.set_ylabel("Data - model [flux]")
-                    ax_res.axhline(0.0, lw=1)
-                    ax_res.errorbar(
-                        lc["t"],
-                        residual,
-                        yerr=residual_err,
-                        fmt=".",
-                        ms=3,
-                        alpha=0.45,
-                        capsize=0,
-                        label=model_name,
-                    )
-
-            except Exception as exc:
-                print(f"Could not draw residuals for {model_name}: {exc}")
+            ax_res.axhline(0.0, lw=1)
+            ax_res.errorbar(
+                lc["t"],
+                residual,
+                yerr=residual_err,
+                fmt=".",
+                ms=3,
+                alpha=0.45,
+                capsize=0,
+                label=model_name,
+            )
 
     ax.set_title(title or f"Microlensing fit: {event_name}")
     ax.legend(fontsize=8)
@@ -501,7 +495,6 @@ def plot_event_fit(
         print(f"Saved plot to: {save_path}")
 
     plt.show()
-
 
 # ============================================================
 # CLI
