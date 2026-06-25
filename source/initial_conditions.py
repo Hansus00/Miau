@@ -109,15 +109,6 @@ class InitialConditions:
 
 
     def _init_fspl(self, prev_results, data=None):
-<<<<<<< HEAD
-        pspl = prev_results["PSPL"]["raw_params"]
-        t_0_init = pspl[0]
-        logt_E_pspl = pspl[1]
-        u_0_pspl = pspl[2]
-        u_0_init = jnp.where(logt_E_pspl < jnp.log(3.0), 0.1, u_0_pspl)
-        rho_init = jnp.where(logt_E_pspl < jnp.log(3.0), jnp.log(1.0), jnp.log(1.0e-3))
-        return jnp.array([t_0_init, logt_E_pspl, u_0_init, rho_init], dtype=jnp.float64)
-=======
         if "PSPL" in prev_results:
             pspl = prev_results["PSPL"]["raw_params"]
         else:
@@ -131,12 +122,13 @@ class InitialConditions:
         return jnp.concatenate([pspl, jnp.asarray([rho0], dtype=jnp.float64)])
 
     def _init_fspl_parallax(self, prev_results, data=None):
-        if "FSPL" in prev_results:
-            fspl = prev_results["FSPL"]["raw_params"]
-        else:
-            fspl = self._init_fspl(prev_results, data)
-        return jnp.concatenate([fspl, jnp.array([0.0, 0.0], dtype=jnp.float64)])
->>>>>>> refs/remotes/origin/main
+        pspl = prev_results["PSPL"]["raw_params"]
+        t_0_init = pspl[0]
+        logt_E_pspl = pspl[1]
+        u_0_pspl = pspl[2]
+        u_0_init = jnp.where(logt_E_pspl < jnp.log(3.0), 0.1, u_0_pspl)
+        rho_init = jnp.where(logt_E_pspl < jnp.log(3.0), jnp.log(1.0), jnp.log(1.0e-3))
+        return jnp.array([t_0_init, logt_E_pspl, u_0_init, rho_init], dtype=jnp.float64)
 
     def _init_pspl_parallax(self, prev_results, data=None):
         pspl = prev_results["PSPL"]["raw_params"]
