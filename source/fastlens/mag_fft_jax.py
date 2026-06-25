@@ -6,9 +6,9 @@ but stays fully differentiable and JIT-friendly. The main entry points are
 """
 
 import jax.numpy as jnp
-from microjax.fastlens.fftlog_jax import fftlog, hankel
-from microjax.fastlens.special import gamma, j1, j2, j1p5
-from microjax.fastlens.special import ellipk, ellipe
+from .fftlog_jax import fftlog, hankel
+from .special import gamma, j1, j2, j1p5
+from .special import ellipk, ellipe
 from jax import lax
 
 

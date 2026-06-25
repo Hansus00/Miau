@@ -48,8 +48,8 @@ class PSPL(ModelBase):
 
 
 class FSPL(ModelBase):
-    """
-    Finite Source Point Lens Model.
+    """Finite-source point-lens model using fastlens FFTLog magnification.
+
     Reparametrization:
     - t_0: t_0 - t_0_shift
     - t_E: log(t_E)
@@ -68,6 +68,7 @@ class FSPL(ModelBase):
             "u_0": params[2],
             "rho": jnp.exp(params[3]),
         }
+
 
 
 class Parallax(ModelBase):
@@ -99,6 +100,37 @@ class Parallax(ModelBase):
             "t_0_par": data["t_0_par"],
             "coords": data["coords"],
         }
+
+
+class FSPLParallax(ModelBase):
+    """Finite-source point-lens model with Roman ephemeris parallax."""
+
+    def __init__(self):
+        super().__init__(
+            "FSPL+Parallax",
+            ["t_0", "t_E", "u_0", "rho", "pi_E_N", "pi_E_E"],
+        )
+
+    def setup_data(self, data, prev_results):
+        if "FSPL" in prev_results:
+            data["t_0_par"] = prev_results["FSPL"]["dict"]["t_0"]
+        else:
+            data["t_0_par"] = prev_results["PSPL"]["dict"]["t_0"]
+        return data
+
+    def to_dict(self, params, data):
+        return {
+            "model": "fspl_parallax",
+            "t_0": params[0] + data["t_0_shift"],
+            "t_E": jnp.exp(params[1]),
+            "u_0": params[2],
+            "rho": jnp.exp(params[3]),
+            "pi_E_N": params[4],
+            "pi_E_E": params[5],
+            "t_0_par": data["t_0_par"],
+            "coords": data["coords"],
+        }
+
 
 
 def _bspl_second_peak_time(t, mag, n_valid, t_0, t_E, u_0, Fs, Fb):

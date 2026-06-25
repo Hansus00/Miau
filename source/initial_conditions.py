@@ -92,6 +92,7 @@ class InitialConditions:
             "PSPL": self._init_pspl,
             "FSPL": self._init_fspl,
             "PSPL+Parallax": self._init_pspl_parallax,
+            "FSPL+Parallax": self._init_fspl_parallax,
             "BSPL": self._init_bspl,
             "FSBL": self._init_fsbl,
         }
@@ -104,10 +105,11 @@ class InitialConditions:
         return init_methods[model_name](prev_results, data)
 
     def _init_pspl(self, prev_results, data=None):
-        t_E = jnp.minimum((self.end_boundary - self.start_boundary)/2, 100.0)
-        return jnp.array([0.0, jnp.log(t_E), 0.1], dtype=jnp.float64)
+        return jnp.array([0.0, jnp.log(20.0), 0.1], dtype=jnp.float64)
+
 
     def _init_fspl(self, prev_results, data=None):
+<<<<<<< HEAD
         pspl = prev_results["PSPL"]["raw_params"]
         t_0_init = pspl[0]
         logt_E_pspl = pspl[1]
@@ -115,6 +117,26 @@ class InitialConditions:
         u_0_init = jnp.where(logt_E_pspl < jnp.log(3.0), 0.1, u_0_pspl)
         rho_init = jnp.where(logt_E_pspl < jnp.log(3.0), jnp.log(1.0), jnp.log(1.0e-3))
         return jnp.array([t_0_init, logt_E_pspl, u_0_init, rho_init], dtype=jnp.float64)
+=======
+        if "PSPL" in prev_results:
+            pspl = prev_results["PSPL"]["raw_params"]
+        else:
+            pspl = self._init_pspl(prev_results, data)
+        rho_grid = jnp.asarray(
+            [1e-5, 3e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2, 3e-2, 1e-1],
+            dtype=jnp.float64,
+        )
+        # Default optimizer path expects one vector; use the middle value for batched runs.
+        rho0 = jnp.log(1e-3)
+        return jnp.concatenate([pspl, jnp.asarray([rho0], dtype=jnp.float64)])
+
+    def _init_fspl_parallax(self, prev_results, data=None):
+        if "FSPL" in prev_results:
+            fspl = prev_results["FSPL"]["raw_params"]
+        else:
+            fspl = self._init_fspl(prev_results, data)
+        return jnp.concatenate([fspl, jnp.array([0.0, 0.0], dtype=jnp.float64)])
+>>>>>>> refs/remotes/origin/main
 
     def _init_pspl_parallax(self, prev_results, data=None):
         pspl = prev_results["PSPL"]["raw_params"]
