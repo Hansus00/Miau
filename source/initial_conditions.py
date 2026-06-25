@@ -104,9 +104,10 @@ class InitialConditions:
 
         return init_methods[model_name](prev_results, data)
 
-    def _init_pspl(self, prev_results, data=None):
-        return jnp.array([0.0, jnp.log(20.0), 0.1], dtype=jnp.float64)
 
+    def _init_pspl(self, prev_results, data=None):
+        t_E = jnp.minimum((self.end_boundary - self.start_boundary)/2, 100.0)
+        return jnp.array([0.0, jnp.log(t_E), 0.1], dtype=jnp.float64)
 
     def _init_fspl(self, prev_results, data=None):
         pspl = prev_results["PSPL"]["raw_params"]
