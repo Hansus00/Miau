@@ -39,6 +39,8 @@ except Exception as exc:
 MODEL_TO_INTERNAL = {
     "PSPL": "pspl",
     "PSPL+Parallax": "parallax",
+    "FSPL": "fspl",
+    "FSPL+Parallax": "fspl_parallax",
     "BSPL": "bspl",
     "BSPL+Parallax": "bspl_parallax",
     "FSBL": "fsbl",
@@ -47,7 +49,9 @@ MODEL_TO_INTERNAL = {
 
 DEFAULT_MODEL_ORDER = [
     "PSPL",
+    "FSPL",
     "PSPL+Parallax",
+    "FSPL+Parallax",
     "BSPL",
     "BSPL+Parallax",
     "FSBL",
@@ -280,6 +284,14 @@ def attach_hidden_parallax_fields(params_by_model: dict, event_name: str, coords
             params_by_model["PSPL+Parallax"]["t_0_par"] = params_by_model["PSPL+Parallax"].get("t_0", 0.0)
         params_by_model["PSPL+Parallax"]["coords"] = coords
 
+    # FSPL+Parallax was fitted with t_0_par from FSPL.
+    if "FSPL+Parallax" in params_by_model:
+        if "FSPL" in params_by_model and "t_0" in params_by_model["FSPL"]:
+            params_by_model["FSPL+Parallax"]["t_0_par"] = params_by_model["FSPL"]["t_0"]
+        else:
+            params_by_model["FSPL+Parallax"]["t_0_par"] = params_by_model["FSPL+Parallax"].get("t_0", 0.0)
+        params_by_model["FSPL+Parallax"]["coords"] = coords
+
     # BSPL+Parallax was fitted with t_0_par from PSPL.
     if "BSPL+Parallax" in params_by_model:
         if "PSPL" in params_by_model and "t_0" in params_by_model["PSPL"]:
@@ -511,6 +523,8 @@ def parse_model_list(text: str, available: dict) -> list[str]:
         "pspl": "PSPL",
         "parallax": "PSPL+Parallax",
         "pspl+parallax": "PSPL+Parallax",
+        "fspl": "FSPL",
+        "fspl+parallax": "FSPL+Parallax",
         "bspl": "BSPL",
         "bspl+parallax": "BSPL+Parallax",
         "fsbl": "FSBL",

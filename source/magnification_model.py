@@ -8,6 +8,7 @@ import jax.numpy as jnp
 from microjax.likelihood import linear_chi2
 
 from binary_lens import fsbl_magnification_microjax_jit, soft_box_penalty
+from finite_source import fspl_uniform_quadrature_from_tau_beta_jit
 
 # Parallax imports are intentionally lazy. Non-parallax models must not fail at
 # import time just because Roman_ephemeris_jax.txt is not present.
@@ -111,6 +112,21 @@ def _parallax_magnification(t, params):
     return _pspl_from_tau_beta(tau + d_tau, params["u_0"] + d_beta)
 
 
+def _fspl_magnification(t, params):
+    """Finite-source point-lens magnification with a uniform source."""
+    tau = (t - params["t_0"]) / params["t_E"]
+    return fspl_uniform_quadrature_from_tau_beta_jit(tau, params["u_0"], params["rho"])
+
+
+def _fspl_parallax_magnification(t, params):
+    """Finite-source point-lens magnification with parallax."""
+    tau = (t - params["t_0"]) / params["t_E"]
+    d_tau, d_beta = _parallax_offsets(t, params)
+    return fspl_uniform_quadrature_from_tau_beta_jit(
+        tau + d_tau, params["u_0"] + d_beta, params["rho"]
+    )
+
+
 def _bspl_magnification(t, params):
     tau_1 = (t - params["t_0_1"]) / params["t_E"]
     tau_2 = (t - params["t_0_2"]) / params["t_E"]
@@ -176,6 +192,8 @@ def _fsbl_parallax_magnification(t, params):
 _MAGNIFICATION_FUNCS = {
     "pspl": _pspl_magnification,
     "parallax": _parallax_magnification,
+    "fspl": _fspl_magnification,
+    "fspl_parallax": _fspl_parallax_magnification,
     "bspl": _bspl_magnification,
     "bspl_parallax": _bspl_parallax_magnification,
     "fsbl": _fsbl_magnification,
@@ -194,6 +212,21 @@ def _prior_parallax(params):
 def _prior_bspl(params):
     prior = 0.5 * (params["q_f"] - 1.0) ** 2 / (10.0**2)
     return prior + 0.5 * (jnp.maximum(-params["q_f"], 0.0) / 3.0) ** 2
+
+
+def _prior_fspl(params):
+    """Weak guardrails for finite-source point-lens fits."""
+    log_rho = jnp.log(params["rho"])
+    log_tE = jnp.log(params["t_E"])
+    return (
+        soft_box_penalty(log_rho, jnp.log(1.0e-6), jnp.log(1.0), 0.35)
+        + soft_box_penalty(log_tE, jnp.log(0.005), jnp.log(2000.0), 0.5)
+        + soft_box_penalty(jnp.abs(params["u_0"]), 0.0, 5.0, 0.5)
+    )
+
+
+def _prior_fspl_parallax(params):
+    return _prior_fspl(params) + _prior_parallax(params)
 
 
 def _prior_fsbl(params):
@@ -228,6 +261,8 @@ def _prior_fsbl_parallax(params):
 
 _PRIOR_FUNCS = {
     "parallax": _prior_parallax,
+    "fspl": _prior_fspl,
+    "fspl_parallax": _prior_fspl_parallax,
     "bspl": _prior_bspl,
     "bspl_parallax": _prior_bspl_parallax,
     "fsbl": _prior_fsbl,

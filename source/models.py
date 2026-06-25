@@ -87,6 +87,67 @@ class Parallax(ModelBase):
         }
 
 
+class FSPL(ModelBase):
+    """Finite-source point-lens model for short/FFP-like events."""
+
+    def __init__(self):
+        super().__init__(
+            "FSPL",
+            ["t_0", "t_E", "u_0", "rho"],
+            learning_rate=float(os.environ.get("FSPL_LEARNING_RATE", "5.0e-3")),
+            n_steps=int(os.environ.get("FSPL_N_STEPS", "5000")),
+            min_improvement=float(os.environ.get("FSPL_MIN_IMPROVEMENT", "1.0e-5")),
+            patience=int(os.environ.get("FSPL_PATIENCE", "40")),
+        )
+
+    def setup_data(self, data, prev_results):
+        if "PSPL" not in prev_results:
+            raise ValueError("FSPL initialization requires PSPL to be run first.")
+        return data
+
+    def to_dict(self, params, data):
+        return {
+            "model": "fspl",
+            "t_0": params[0] + data["t_0_shift"],
+            "t_E": jnp.exp(params[1]),
+            "u_0": params[2],
+            "rho": jnp.exp(params[3]),
+        }
+
+
+class FSPLParallax(ModelBase):
+    """Finite-source point-lens model with parallax."""
+
+    def __init__(self):
+        super().__init__(
+            "FSPL+Parallax",
+            ["t_0", "t_E", "u_0", "rho", "pi_E_N", "pi_E_E"],
+            learning_rate=float(os.environ.get("FSPL_PARALLAX_LEARNING_RATE", "3.0e-3")),
+            n_steps=int(os.environ.get("FSPL_PARALLAX_N_STEPS", os.environ.get("FSPL_N_STEPS", "5000"))),
+            min_improvement=float(os.environ.get("FSPL_PARALLAX_MIN_IMPROVEMENT", os.environ.get("FSPL_MIN_IMPROVEMENT", "1.0e-5"))),
+            patience=int(os.environ.get("FSPL_PARALLAX_PATIENCE", os.environ.get("FSPL_PATIENCE", "40"))),
+        )
+
+    def setup_data(self, data, prev_results):
+        if "FSPL" not in prev_results:
+            raise ValueError("FSPL+Parallax initialization requires FSPL to be run first.")
+        data["t_0_par"] = prev_results["FSPL"]["dict"]["t_0"]
+        return data
+
+    def to_dict(self, params, data):
+        return {
+            "model": "fspl_parallax",
+            "t_0": params[0] + data["t_0_shift"],
+            "t_E": jnp.exp(params[1]),
+            "u_0": params[2],
+            "rho": jnp.exp(params[3]),
+            "pi_E_N": params[4],
+            "pi_E_E": params[5],
+            "t_0_par": data["t_0_par"],
+            "coords": data["coords"],
+        }
+
+
 def _bspl_second_peak_time(t, flux, n_valid, t_0, t_E, u_0, Fs, Fb):
     """Estimate a second-source peak from positive residuals to PSPL."""
     A_pspl = magnification(t, {"model": "pspl", "t_0": t_0, "t_E": t_E, "u_0": u_0})

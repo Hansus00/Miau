@@ -91,6 +91,8 @@ class InitialConditions:
         init_methods = {
             "PSPL": self._init_pspl,
             "PSPL+Parallax": self._init_pspl_parallax,
+            "FSPL": self._init_fspl,
+            "FSPL+Parallax": self._init_fspl_parallax,
             "BSPL": self._init_bspl,
             "BSPL+Parallax": self._init_bspl_parallax,
             "FSBL": self._init_fsbl,
@@ -110,6 +112,32 @@ class InitialConditions:
     def _init_pspl_parallax(self, prev_results, data=None):
         pspl = prev_results["PSPL"]["raw_params"]
         return jnp.concatenate([pspl, jnp.array([0.0, 0.0], dtype=jnp.float64)])
+
+    def _init_fspl(self, prev_results, data=None):
+        """Multistart rho grid seeded from PSPL.
+
+        Optimized coordinates are [t0_shifted, log(tE), u0, log(rho)].
+        A rho grid is important for FFP/source-crossing events because rho can
+        be weakly constrained unless the initial value is close enough.
+        """
+        pspl = prev_results["PSPL"]["raw_params"]
+        rho_grid = jnp.asarray(
+            [1.0e-5, 3.0e-5, 1.0e-4, 3.0e-4, 1.0e-3, 3.0e-3, 1.0e-2, 3.0e-2, 1.0e-1],
+            dtype=jnp.float64,
+        )
+        starts = []
+        for rho in rho_grid:
+            starts.append(
+                jnp.asarray(
+                    [pspl[0], pspl[1], pspl[2], jnp.log(rho)],
+                    dtype=jnp.float64,
+                )
+            )
+        return jnp.stack(starts)
+
+    def _init_fspl_parallax(self, prev_results, data=None):
+        fspl = prev_results["FSPL"]["raw_params"]
+        return jnp.concatenate([fspl, jnp.array([0.0, 0.0], dtype=jnp.float64)])
 
     def _init_bspl(self, prev_results, data=None):
         pspl = prev_results["PSPL"]["raw_params"]

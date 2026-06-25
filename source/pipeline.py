@@ -469,9 +469,9 @@ def run_pipeline(files, out_dir, data_loader, models, max_len):
         n_starts = next(iter(n_starts_set))
         print(f"Using {n_starts} start(s) per event for {m.name}.")
 
-        is_fsbl_family = "FSBL" in m.name.upper()
+        is_finite_source_family = ("FSBL" in m.name.upper()) or ("FSPL" in m.name.upper())
 
-        if is_fsbl_family:
+        if is_finite_source_family:
             print(
                 f"{m.name} uses fast finite-source mode: event-by-event, "
                 f"coarse subset={fsbl_coarse_max_points}, opt subset={fsbl_opt_max_points}, "
