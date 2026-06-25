@@ -17,7 +17,6 @@ def main():
     files = [
         os.path.join(input_dir, f) for f in os.listdir(input_dir) if f.endswith(".csv")
     ]
-    files = files[90:91]
 
     data_loader = DataLoader(coord_file="data/coords.csv")
     models = [PSPL(), FSPL()]
