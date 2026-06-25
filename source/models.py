@@ -47,6 +47,29 @@ class PSPL(ModelBase):
         }
 
 
+class FSPL(ModelBase):
+    """
+    Finite Source Point Lens Model.
+    Reparametrization:
+    - t_0: t_0 - t_0_shift
+    - t_E: log(t_E)
+    - u_0: u_0
+    - rho: log(rho)
+    """
+
+    def __init__(self):
+        super().__init__("FSPL", ["t_0", "t_E", "u_0", "rho"])
+
+    def to_dict(self, params, data):
+        return {
+            "model": "fspl",
+            "t_0": params[0] + data["t_0_shift"],
+            "t_E": jnp.exp(params[1]),
+            "u_0": params[2],
+            "rho": jnp.exp(params[3]),
+        }
+
+
 class Parallax(ModelBase):
     """
     PSPL Model with Satellite Parallax.

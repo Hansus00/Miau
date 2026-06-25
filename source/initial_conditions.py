@@ -90,6 +90,7 @@ class InitialConditions:
         """
         init_methods = {
             "PSPL": self._init_pspl,
+            "FSPL": self._init_fspl,
             "PSPL+Parallax": self._init_pspl_parallax,
             "BSPL": self._init_bspl,
             "FSBL": self._init_fsbl,
@@ -103,7 +104,14 @@ class InitialConditions:
         return init_methods[model_name](prev_results, data)
 
     def _init_pspl(self, prev_results, data=None):
-        return jnp.array([0.0, jnp.log(20.0), 0.1], dtype=jnp.float64)
+        t_E = jnp.minimum((self.end_boundary - self.start_boundary)/2, 100.0)
+        return jnp.array([0.0, jnp.log(t_E), 0.1], dtype=jnp.float64)
+
+    def _init_fspl(self, prev_results, data=None):
+        pspl = prev_results["PSPL"]["raw_params"]
+        return jnp.concatenate(
+            [pspl, jnp.array([jnp.log(1.0e-3)], dtype=jnp.float64)]
+        )
 
     def _init_pspl_parallax(self, prev_results, data=None):
         pspl = prev_results["PSPL"]["raw_params"]

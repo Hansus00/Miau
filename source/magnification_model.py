@@ -162,8 +162,8 @@ def neg_lnprob(t, params, mag, mag_err):
     A = magnification(t, params)
     Fs, _, Fb, _, chi2 = linear_chi2(A, mag, mag_err)
 
-    prior_fb = _negative_flux_prior(Fb)
-    prior_fs = _negative_flux_prior(Fs)
+    prior_fb = _negative_flux_prior(Fb, sigma=2.0)
+    prior_fs = _negative_flux_prior(Fs, sigma=2.0)
     prior_term = prior_fs + prior_fb
 
     model = params.get("model")
