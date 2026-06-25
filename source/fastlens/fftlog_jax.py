@@ -9,7 +9,7 @@ appear in the FFT-based microlensing algorithm.
 """
 
 import jax.numpy as jnp
-from microjax.fastlens.special import gamma
+from .special import gamma
 from jax.numpy.fft import rfft, irfft
 from jax import jit
 from functools import partial
