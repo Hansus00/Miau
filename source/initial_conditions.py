@@ -109,9 +109,12 @@ class InitialConditions:
 
     def _init_fspl(self, prev_results, data=None):
         pspl = prev_results["PSPL"]["raw_params"]
-        return jnp.concatenate(
-            [pspl, jnp.array([jnp.log(1.0e-3)], dtype=jnp.float64)]
-        )
+        t_0_init = pspl[0]
+        logt_E_pspl = pspl[1]
+        u_0_pspl = pspl[2]
+        u_0_init = jnp.where(logt_E_pspl < jnp.log(3.0), 0.1, u_0_pspl)
+        rho_init = jnp.where(logt_E_pspl < jnp.log(3.0), jnp.log(1.0), jnp.log(1.0e-3))
+        return jnp.array([t_0_init, logt_E_pspl, u_0_init, rho_init], dtype=jnp.float64)
 
     def _init_pspl_parallax(self, prev_results, data=None):
         pspl = prev_results["PSPL"]["raw_params"]
