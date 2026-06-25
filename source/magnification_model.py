@@ -3,7 +3,7 @@ from __future__ import annotations
 import jax
 
 jax.config.update("jax_enable_x64", True)
-
+import os
 import jax.numpy as jnp
 from microjax.likelihood import linear_chi2
 
@@ -242,10 +242,12 @@ def _prior_fsbl(params):
     log_rho = jnp.log(params["rho"])
     log_tE = jnp.log(params["t_E"])
 
+    rho_max = float(os.environ.get("FSBL_RHO_MAX", "0.05"))
+
     return (
         soft_box_penalty(log_s, jnp.log(0.05), jnp.log(20.0), 0.25)
         + soft_box_penalty(log_q, jnp.log(1.0e-6), jnp.log(1.0), 0.35)
-        + soft_box_penalty(log_rho, jnp.log(1.0e-5), jnp.log(0.2), 0.35)
+        + soft_box_penalty(log_rho, jnp.log(1.0e-5), jnp.log(rho_max), 0.10)
         + soft_box_penalty(log_tE, jnp.log(0.05), jnp.log(2000.0), 0.5)
         + soft_box_penalty(jnp.abs(params["u_0"]), 0.0, 5.0, 0.5)
     )

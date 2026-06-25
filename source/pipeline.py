@@ -11,6 +11,7 @@ import optax
 from initial_conditions import InitialConditions
 from magnification_model import magnification
 from optimization import build_optimize_loop, get_eval_metrics
+from twinkle_grid import save_twinkle_candidates_csv, twinkle_evaluate_best_fsbl, twinkle_grid_search_fsbl
 
 
 def _stack_numeric_dict(batch_data_dict):
@@ -173,6 +174,54 @@ def _append_model_summary(
     chi2_list.append(chi2)
 
 
+
+def _append_precomputed_model_summary(
+    *,
+    m,
+    event_index,
+    single_data,
+    best_params,
+    best_start_idx,
+    best_objective,
+    n_starts,
+    precomputed_chi2,
+    precomputed_Fs,
+    precomputed_Fb,
+    eval_n_points,
+    event_model_results,
+    batched_dict_lists,
+    Fs_list,
+    Fb_list,
+    chi2_list,
+):
+    """Save a model result when magnification/linear fit was computed externally.
+
+    This is used for Twinkle-only FSBL mode.  It avoids immediately re-evaluating
+    the same binary-lens solution with microJAX, which can be extremely slow.
+    """
+    p_dict = m.to_dict(best_params, single_data)
+
+    dof = int(eval_n_points) - len(m.param_names) - 2
+    dof = max(dof, 1)
+
+    event_model_results[event_index][m.name] = {
+        "param_dict": p_dict,
+        "chi2": jnp.asarray(precomputed_chi2, dtype=jnp.float64),
+        "dof": dof,
+        "Fs": jnp.asarray(precomputed_Fs, dtype=jnp.float64),
+        "Fb": jnp.asarray(precomputed_Fb, dtype=jnp.float64),
+        "best_start_idx": best_start_idx,
+        "best_objective": best_objective,
+        "n_starts": n_starts,
+        "eval_n_points": int(eval_n_points),
+    }
+
+    for k, v in p_dict.items():
+        batched_dict_lists[k].append(v)
+    Fs_list.append(jnp.asarray(precomputed_Fs, dtype=jnp.float64))
+    Fb_list.append(jnp.asarray(precomputed_Fb, dtype=jnp.float64))
+    chi2_list.append(jnp.asarray(precomputed_chi2, dtype=jnp.float64))
+
 def _run_batched_model(
     *,
     m,
@@ -247,6 +296,11 @@ def _run_memory_heavy_multistart_model(
     opt_max_points,
     final_full_eval,
     skip_delta_chi2,
+    use_twinkle_grid_search=False,
+    save_twinkle_grid=False,
+    out_dir=None,
+    valid_files=None,
+    refine_with_microjax=True,
 ):
     """
     Fast and safe path for FSBL/microJAX.
@@ -279,6 +333,64 @@ def _run_memory_heavy_multistart_model(
         full_data = _single_event_data(batched_data, i, trim_to_valid=True)
         starts = init_params_per_event[i]
         n_starts = int(starts.shape[0])
+        n_starts_report = n_starts
+
+        # Optional Twinkle GPU grid search for FSBL.  This is deliberately only
+        # used for the non-parallax FSBL model: FSBL+Parallax is then seeded from
+        # the best FSBL solution and refined with microJAX.
+        if use_twinkle_grid_search and m.name == "FSBL":
+            twinkle_result = twinkle_grid_search_fsbl(full_data, starts[0])
+            starts = twinkle_result.starts
+            n_starts = int(starts.shape[0])
+            n_starts_report = int(twinkle_result.n_evaluated)
+
+            if save_twinkle_grid and out_dir is not None and valid_files is not None:
+                event_base = os.path.basename(valid_files[i]).replace(".csv", "")
+                save_twinkle_candidates_csv(
+                    os.path.join(out_dir, "twinkle_grid", f"{event_base}_twinkle_top.csv"),
+                    twinkle_result.rows,
+                )
+
+            # For broad searches the best practical result is often the Twinkle
+            # solution itself.  microJAX refinement can be very slow and may even
+            # walk away from a good caustic basin if the subset/objective is too
+            # crude.  Use FSBL_REFINE=1 only for final polishing of selected events.
+            if not refine_with_microjax:
+                final_twinkle = twinkle_evaluate_best_fsbl(full_data, starts)
+                best_params_i = final_twinkle.params
+                best_start_idx_i = 0
+                best_objective_i = jnp.asarray(final_twinkle.row["chi2"], dtype=jnp.float64)
+
+                _append_precomputed_model_summary(
+                    m=m,
+                    event_index=i,
+                    single_data=full_data,
+                    best_params=best_params_i,
+                    best_start_idx=jnp.asarray(best_start_idx_i, dtype=jnp.int32),
+                    best_objective=best_objective_i,
+                    n_starts=n_starts_report,
+                    precomputed_chi2=final_twinkle.row["chi2"],
+                    precomputed_Fs=final_twinkle.row["Fs"],
+                    precomputed_Fb=final_twinkle.row["Fb"],
+                    eval_n_points=final_twinkle.eval_n_points,
+                    event_model_results=event_model_results,
+                    batched_dict_lists=batched_dict_lists,
+                    Fs_list=Fs_list,
+                    Fb_list=Fb_list,
+                    chi2_list=chi2_list,
+                )
+                best_params_all.append(best_params_i)
+                best_start_idx_all.append(jnp.asarray(best_start_idx_i, dtype=jnp.int32))
+                best_objective_all.append(best_objective_i)
+                print(
+                    f"  {m.name} event {i + 1}/{num_events}: Twinkle-only result, "
+                    f"chi2={float(final_twinkle.row['chi2']):.6g}, "
+                    f"eval_points={final_twinkle.eval_n_points}, "
+                    f"tE={final_twinkle.row['tE']:.5g}, u0={final_twinkle.row['u0']:.5g}, "
+                    f"s={final_twinkle.row['s']:.5g}, q={final_twinkle.row['q']:.5g}, "
+                    f"rho={final_twinkle.row['rho']:.5g}, alpha={final_twinkle.row['alpha_deg']:.3f}"
+                )
+                continue
 
         # Optional screening: if the best previous cheap model already fits well,
         # do not spend microJAX time on a binary-lens search. Disabled by default.
@@ -303,7 +415,7 @@ def _run_memory_heavy_multistart_model(
                         best_params=best_params_i,
                         best_start_idx=jnp.asarray(best_start_idx_i, dtype=jnp.int32),
                         best_objective=best_objective_i,
-                        n_starts=n_starts,
+                        n_starts=n_starts_report,
                         event_model_results=event_model_results,
                         batched_dict_lists=batched_dict_lists,
                         Fs_list=Fs_list,
@@ -324,22 +436,34 @@ def _run_memory_heavy_multistart_model(
             f"  {m.name} event {i + 1}/{num_events}: "
             f"n_valid={int(np.asarray(full_data['n_valid']))}, "
             f"coarse_points={len(coarse_data['t'])}, opt_points={len(opt_data['t'])}, "
-            f"grid_starts={n_starts}, top_k={min(top_k, n_starts)}, "
+            f"grid_starts={n_starts_report}, candidates={n_starts}, top_k={min(top_k, n_starts)}, "
             f"chunk={start_chunk_size}"
         )
 
         # Stage 1: coarse ranking on a deliberately thinned light curve.
-        coarse_scores = []
-        for start0 in range(0, n_starts, start_chunk_size):
-            start1 = min(start0 + start_chunk_size, n_starts)
-            start_chunk = starts[start0:start1]
-            scores = 2.0 * eval_start_chunk(start_chunk, coarse_data)
-            coarse_scores.append(scores)
-
-        coarse_scores = jnp.concatenate(coarse_scores)
+        # If starts already came from Twinkle, they are already sorted by Twinkle
+        # chi2.  Re-ranking with microJAX can dominate runtime, so by default we
+        # skip this extra microJAX pass for Twinkle-seeded FSBL.
+        skip_microjax_coarse = (
+            use_twinkle_grid_search
+            and m.name == "FSBL"
+            and os.environ.get("TWINKLE_SKIP_MICROJAX_COARSE", "1") == "1"
+        )
         n_to_optimize = min(top_k, n_starts)
-        candidate_idx = jnp.argsort(coarse_scores)[:n_to_optimize]
-        candidate_starts = starts[candidate_idx]
+        if skip_microjax_coarse:
+            candidate_idx = jnp.arange(n_to_optimize)
+            candidate_starts = starts[candidate_idx]
+        else:
+            coarse_scores = []
+            for start0 in range(0, n_starts, start_chunk_size):
+                start1 = min(start0 + start_chunk_size, n_starts)
+                start_chunk = starts[start0:start1]
+                scores = 2.0 * eval_start_chunk(start_chunk, coarse_data)
+                coarse_scores.append(scores)
+
+            coarse_scores = jnp.concatenate(coarse_scores)
+            candidate_idx = jnp.argsort(coarse_scores)[:n_to_optimize]
+            candidate_starts = starts[candidate_idx]
 
         best_params_i = None
         best_objective_i = None
@@ -373,7 +497,7 @@ def _run_memory_heavy_multistart_model(
             best_params=best_params_i,
             best_start_idx=jnp.asarray(best_start_idx_i, dtype=jnp.int32),
             best_objective=best_objective_i,
-            n_starts=n_starts,
+            n_starts=n_starts_report,
             event_model_results=event_model_results,
             batched_dict_lists=batched_dict_lists,
             Fs_list=Fs_list,
@@ -413,6 +537,13 @@ def run_pipeline(files, out_dir, data_loader, models, max_len):
 
     skip_raw = os.environ.get("FSBL_SKIP_DELTA_CHI2", "")
     fsbl_skip_delta_chi2 = float(skip_raw) if skip_raw.strip() else None
+
+    use_twinkle_grid_search = os.environ.get("TWINKLE_GRID_SEARCH", "0") == "1"
+    save_twinkle_grid = os.environ.get("TWINKLE_SAVE_GRID", "1") == "1"
+    # If Twinkle grid is enabled, default to using the Twinkle solution directly.
+    # Set FSBL_REFINE=1 only when you really want slow microJAX polishing.
+    fsbl_refine_default = "0" if use_twinkle_grid_search else "1"
+    fsbl_refine_with_microjax = os.environ.get("FSBL_REFINE", fsbl_refine_default) == "1"
 
     batch_data_dict = defaultdict(list)
     valid_files = []
@@ -476,7 +607,9 @@ def run_pipeline(files, out_dir, data_loader, models, max_len):
                 f"{m.name} uses fast finite-source mode: event-by-event, "
                 f"coarse subset={fsbl_coarse_max_points}, opt subset={fsbl_opt_max_points}, "
                 f"chunk={fsbl_start_chunk_size}, top_k={fsbl_top_k}, "
-                f"final_full_eval={fsbl_final_full_eval}."
+                f"final_full_eval={fsbl_final_full_eval}, "
+                f"twinkle_grid={use_twinkle_grid_search and m.name == 'FSBL'}, "
+                f"fsbl_refine={fsbl_refine_with_microjax if m.name == 'FSBL' else True}."
             )
             prev_results[m.name] = _run_memory_heavy_multistart_model(
                 m=m,
@@ -490,6 +623,11 @@ def run_pipeline(files, out_dir, data_loader, models, max_len):
                 opt_max_points=fsbl_opt_max_points,
                 final_full_eval=fsbl_final_full_eval,
                 skip_delta_chi2=fsbl_skip_delta_chi2,
+                use_twinkle_grid_search=use_twinkle_grid_search,
+                save_twinkle_grid=save_twinkle_grid,
+                out_dir=out_dir,
+                valid_files=valid_files,
+                refine_with_microjax=(fsbl_refine_with_microjax if m.name == "FSBL" else True),
             )
         else:
             batched_init_params = jnp.stack(init_params_per_event)

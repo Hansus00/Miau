@@ -5,3 +5,6 @@ optax==0.2.6
 microjaxx==0.1.1
 # Optional now. The main FSBL backend is microJAX, not microlux/Twinkle.
 # microlux==0.2.0
+# Optional for the GPU binary-lens grid pre-search:
+# Twinkle is not on PyPI. Compile it from https://github.com/AsterLight0626/Twinkle
+# and put the generated python module on PYTHONPATH, then run with TWINKLE_GRID_SEARCH=1.

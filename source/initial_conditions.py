@@ -5,7 +5,6 @@ import jax
 jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 
-
 class InitialConditions:
     """Class for estimating initial conditions for optimization."""
 
@@ -122,7 +121,7 @@ class InitialConditions:
         """
         pspl = prev_results["PSPL"]["raw_params"]
         rho_grid = jnp.asarray(
-            [1.0e-5, 3.0e-5, 1.0e-4, 3.0e-4, 1.0e-3, 3.0e-3, 1.0e-2, 3.0e-2, 1.0e-1],
+            [1.0e-5, 1.0e-4, 1.0e-3, 1.0e-2, 3.0e-2, 1.0e-1, 1.0, 1e1],
             dtype=jnp.float64,
         )
         starts = []
@@ -182,8 +181,8 @@ class InitialConditions:
         # wide topologies; planetary to stellar-ish mass ratios; and the main
         # trajectory-angle degeneracies.  Increase these arrays if you want a
         # slower but denser search.
-        s_grid = jnp.asarray([0.5, 0.8, 1.0, 1.25, 2.0], dtype=jnp.float64)
-        q_grid = jnp.asarray([1.0e-4, 1.0e-3, 1.0e-2, 1.0e-1], dtype=jnp.float64)
+        s_grid = jnp.asarray([0.3,0.5, 0.8, 1.0, 1.25, 2.0], dtype=jnp.float64)
+        q_grid = jnp.asarray([1.0e-5, 1.0e-4, 1.0e-3, 1.0e-2, 1.0e-1], dtype=jnp.float64)
         rho_grid = jnp.asarray([1.0e-3], dtype=jnp.float64)
         alpha_grid = jnp.linspace(0.0, 360.0, 8, endpoint=False, dtype=jnp.float64)
 
