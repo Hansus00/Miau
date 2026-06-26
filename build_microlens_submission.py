@@ -78,6 +78,221 @@ def parse_params_txt(path: Path) -> Dict[str, Dict[str, Any]]:
     return sections
 
 
+# -----------------------------------------------------------------------------
+# Parsing PyMultiNest FSBL output directories
+# -----------------------------------------------------------------------------
+
+MN_THETA_NAMES = ["t0", "log_tE", "u0", "log_s", "log_q", "log_rho", "alpha_deg"]
+
+
+def infer_event_id_from_multinest_dir(path: Path) -> str:
+    """
+    Infer event id from directories such as:
+        RMDC26_000005_multinest_FSBL_from_FSPL
+        RMDC26_000005_multinest_from_fspl_deep
+    """
+    name = path.name
+    if "_multinest" in name:
+        return name.split("_multinest", 1)[0]
+    return name
+
+
+def parse_multinest_best_fit_txt(path: Path) -> Dict[str, Any]:
+    """
+    Parse best_fit.txt written by source/multinest_cpu.py.
+
+    This file is more useful than raw mn_stats.dat because it contains Fs/Fb/chi2
+    in addition to the maximum-likelihood nonlinear parameters.
+    """
+    raw: Dict[str, Any] = {}
+    if not path.exists():
+        return raw
+
+    with path.open("r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or ":" not in line:
+                continue
+            key, val = line.split(":", 1)
+            key = key.strip()
+            raw[key] = parse_float_maybe(val)
+
+    section: Dict[str, Any] = {}
+    if as_float(raw, "chi2") is not None:
+        section["Chi2"] = raw["chi2"]
+    if as_float(raw, "Fs") is not None:
+        section["Fs"] = raw["Fs"]
+    if as_float(raw, "Fb") is not None:
+        section["Fb"] = raw["Fb"]
+
+    if as_float(raw, "t0") is not None:
+        section["t_0"] = raw["t0"]
+    if as_float(raw, "u0") is not None:
+        section["u_0"] = raw["u0"]
+    if as_float(raw, "alpha_deg") is not None:
+        section["alpha_deg"] = raw["alpha_deg"]
+
+    # Prefer explicitly written physical values. Fall back to exponentiated logs.
+    if as_float(raw, "tE") is not None:
+        section["t_E"] = raw["tE"]
+    elif as_float(raw, "log_tE") is not None:
+        section["t_E"] = math.exp(float(raw["log_tE"]))
+
+    if as_float(raw, "s") is not None:
+        section["s"] = raw["s"]
+    elif as_float(raw, "log_s") is not None:
+        section["s"] = math.exp(float(raw["log_s"]))
+
+    if as_float(raw, "q") is not None:
+        section["q"] = raw["q"]
+    elif as_float(raw, "log_q") is not None:
+        section["q"] = math.exp(float(raw["log_q"]))
+
+    if as_float(raw, "rho") is not None:
+        section["rho"] = raw["rho"]
+    elif as_float(raw, "log_rho") is not None:
+        section["rho"] = math.exp(float(raw["log_rho"]))
+
+    section["multinest_source"] = "best_fit.txt"
+    return section
+
+
+def _extract_floats_from_line(line: str) -> List[float]:
+    out: List[float] = []
+    for m in FLOAT_RE.finditer(line):
+        try:
+            out.append(float(m.group(0)))
+        except ValueError:
+            pass
+    return out
+
+
+def parse_mn_stats_maxlike(path: Path, ndim: int = 7) -> Dict[str, Any]:
+    """
+    Parse maximum-likelihood nonlinear FSBL parameters from mn_stats.dat.
+
+    MultiNest/PyMultiNest formats differ slightly. This parser looks for a block
+    containing 'Maximum Likelihood Parameters' and then extracts ndim numerical
+    parameter values. It handles both formats like:
+
+        1   2461854.8
+        2   1.23
+
+    and simple one-value-per-line formats.
+
+    The assumed parameter order is the order used in source/multinest_cpu.py:
+        t0, log_tE, u0, log_s, log_q, log_rho, alpha_deg
+
+    Raw mn_stats.dat does not contain Fs/Fb/chi2. If best_fit.txt is present,
+    parse_multinest_result_dir() will merge those values from there.
+    """
+    if not path.exists():
+        return {}
+
+    text = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+    start = None
+    for i, line in enumerate(text):
+        low = line.lower()
+        if "maximum" in low and "likelihood" in low and "parameter" in low:
+            start = i + 1
+            break
+    if start is None:
+        return {}
+
+    vals: List[float] = []
+    expected_index = 1
+    for line in text[start:]:
+        low = line.strip().lower()
+        if not low:
+            # allow one blank, but stop if we already found values
+            if vals:
+                break
+            continue
+        if any(marker in low for marker in ["maximum a posteriori", "marginal", "mean", "mode", "evidence", "posterior"]):
+            if vals:
+                break
+
+        nums = _extract_floats_from_line(line)
+        if not nums:
+            continue
+
+        # Common MultiNest layout: '<index> <value>'
+        if len(nums) >= 2 and abs(nums[0] - expected_index) < 1e-9:
+            vals.append(nums[1])
+            expected_index += 1
+        else:
+            vals.append(nums[0])
+
+        if len(vals) >= ndim:
+            break
+
+    if len(vals) < ndim:
+        return {}
+
+    theta = vals[:ndim]
+    section: Dict[str, Any] = {
+        "t_0": theta[0],
+        "t_E": math.exp(theta[1]),
+        "u_0": theta[2],
+        "s": math.exp(theta[3]),
+        "q": math.exp(theta[4]),
+        "rho": math.exp(theta[5]),
+        "alpha_deg": theta[6],
+        "multinest_source": "mn_stats.dat maximum-likelihood block",
+    }
+    return section
+
+
+def parse_multinest_result_dir(path: Path) -> Optional[Dict[str, Any]]:
+    """
+    Return an FSBL-like section from a MultiNest output directory.
+
+    Preference order:
+      1. best_fit.txt, because it contains Fs/Fb/chi2 written by our code.
+      2. mn_stats.dat maximum-likelihood parameters.
+
+    If both exist, parameters from best_fit.txt win, but missing values are filled
+    from mn_stats.dat.
+    """
+    best = parse_multinest_best_fit_txt(path / "best_fit.txt")
+    stats = parse_mn_stats_maxlike(path / "mn_stats.dat")
+
+    if not best and not stats:
+        return None
+
+    merged = dict(stats)
+    merged.update(best)
+
+    required = ["t_0", "u_0", "t_E", "s", "q", "rho", "alpha_deg"]
+    if any(as_float(merged, k) is None for k in required):
+        return None
+
+    # If chi2/Fs/Fb are missing, keep the row; the CSV validator may complain
+    # about missing fluxes, but this lets the user see and fix incomplete outputs.
+    return merged
+
+
+def iter_multinest_dirs(results_roots: Iterable[Path]) -> Iterable[Path]:
+    """Find MultiNest result dirs containing mn_stats.dat under result roots."""
+    seen = set()
+    for root in results_roots:
+        candidates: List[Path] = []
+        if root.is_dir() and (root / "mn_stats.dat").exists():
+            candidates.append(root)
+        elif root.exists():
+            candidates.extend(p.parent for p in root.rglob("mn_stats.dat"))
+
+        for d in sorted(candidates):
+            # Keep the intended FSBL-from-FSPL folders, but also accept other
+            # explicit MultiNest output dirs if the user passes them directly.
+            if "multinest" not in d.name.lower() and d != root:
+                continue
+            rp = d.resolve()
+            if rp not in seen:
+                seen.add(rp)
+                yield d
+
+
 def infer_event_id_from_params_file(path: Path) -> str:
     name = path.name
     if name.endswith("_params.txt"):
@@ -363,8 +578,14 @@ def iter_params_files(results_roots: Iterable[Path]) -> Iterable[Path]:
                     yield p
 
 
-def build_rows(results_roots: List[Path], include_models: Optional[set[str]] = None) -> List[Dict[str, Any]]:
+def build_rows(
+    results_roots: List[Path],
+    include_models: Optional[set[str]] = None,
+    include_multinest: bool = True,
+) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
+
+    # Standard pipeline *_params.txt files.
     for params_file in iter_params_files(results_roots):
         event_id = infer_event_id_from_params_file(params_file)
         sections = parse_params_txt(params_file)
@@ -375,6 +596,23 @@ def build_rows(results_roots: List[Path], include_models: Optional[set[str]] = N
             row = convert_section_to_row(event_id, model_name, section, source_tag=source_tag)
             if row is not None:
                 rows.append(row)
+
+    # PyMultiNest FSBL outputs, e.g. results/*multinest_FSBL_from_FSPL*/mn_stats.dat.
+    if include_multinest and (include_models is None or "FSBL" in include_models):
+        for mn_dir in iter_multinest_dirs(results_roots):
+            event_id = infer_event_id_from_multinest_dir(mn_dir)
+            section = parse_multinest_result_dir(mn_dir)
+            if section is None:
+                print(f"WARNING: Could not parse MultiNest result directory: {mn_dir}")
+                continue
+            source_tag = str(mn_dir).replace(os.sep, "_") + "_maximum_likelihood"
+            row = convert_section_to_row(event_id, "FSBL", section, source_tag=source_tag)
+            if row is not None:
+                row["solution_alias"] = safe_alias("FSBL_MultiNest_ML", source_tag)
+                old_notes = row.get("notes", "")
+                row["notes"] = old_notes + " Maximum-likelihood FSBL parameters imported from MultiNest output."
+                rows.append(row)
+
     return rows
 
 
@@ -502,6 +740,11 @@ def main() -> None:
         help="Comma-separated model sections to include.",
     )
     ap.add_argument("--best-per-event", action="store_true", help="Only submit one best log-likelihood row per event.")
+    ap.add_argument(
+        "--no-multinest",
+        action="store_true",
+        help="Do not scan MultiNest output dirs such as *multinest_FSBL_from_FSPL/mn_stats.dat.",
+    )
     ap.add_argument("--run-microlens-submit", action="store_true", help="Run microlens-submit init/import/export.")
     ap.add_argument("--submission-dir", default="rmdc26_submission", help="Submission project directory.")
     ap.add_argument("--team-name", default="Barbara Bialek", help="Team name for submission.json.")
@@ -514,7 +757,7 @@ def main() -> None:
 
     roots = [Path(x) for x in args.results]
     include_models = {m.strip() for m in args.models.split(",") if m.strip()}
-    rows = build_rows(roots, include_models=include_models)
+    rows = build_rows(roots, include_models=include_models, include_multinest=not args.no_multinest)
 
     if args.best_per_event:
         rows = choose_best_per_event(rows)
