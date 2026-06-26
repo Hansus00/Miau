@@ -17,7 +17,7 @@ SIMPLE_RESULTS_DIR = RESULTS_DIR / "optax_results"
 LOGS_DIR = REPO_ROOT / "logs"
 SIMPLE_SUFFIX = "_simple"
 MULTINEST_SUFFIX = "_multinest_FSBL_from_FSPL"
-CHI2_THRESHOLD = 2.0
+CHI2_THRESHOLD = 1.5
 
 
 def _event_files() -> list[Path]:
@@ -40,6 +40,33 @@ def _extract_best_chi2_dof(params_file: Path) -> float:
     values = [float(x) for x in re.findall(r"chi2/dof:\s*([-+0-9.eE]+)", text)]
     values = [value for value in values if math.isfinite(value)]
     return min(values) if values else 999999.0
+
+
+def _extract_best_model(params_file: Path) -> str:
+    try:
+        text = params_file.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return ""
+
+    current_model = ""
+    best_model = ""
+    best_chi2_dof = float("inf")
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line.startswith("[") and line.endswith("]"):
+            current_model = line[1:-1].strip()
+            continue
+        if current_model and line.startswith("chi2/dof:"):
+            match = re.search(r"chi2/dof:\s*([-+0-9.eE]+)", line)
+            if match is None:
+                continue
+            value = float(match.group(1))
+            if math.isfinite(value) and value < best_chi2_dof:
+                best_chi2_dof = value
+                best_model = current_model
+    return best_model
 
 
 def _tee_run(command: list[str], log_path: Path, env: dict[str, str]) -> int:
@@ -89,10 +116,20 @@ def main() -> int:
             continue
 
         best_chi2_dof = _extract_best_chi2_dof(params_file)
+        best_model = _extract_best_model(params_file)
+        print(f"Best simple model for {event} = {best_model or 'unknown'}")
         print(f"Best simple chi2/dof for {event} = {best_chi2_dof}")
 
-        if math.isfinite(best_chi2_dof) and best_chi2_dof > CHI2_THRESHOLD:
-            print(f"Running Twinkle-MultiNest for {event} because best simple chi2/dof > {CHI2_THRESHOLD:g}")
+        should_run_multinest = (
+            (math.isfinite(best_chi2_dof) and best_chi2_dof > CHI2_THRESHOLD)
+            or best_model == "BSPL"
+        )
+
+        if should_run_multinest:
+            if best_model == "BSPL" and not (math.isfinite(best_chi2_dof) and best_chi2_dof > CHI2_THRESHOLD):
+                print(f"Running Twinkle-MultiNest for {event} because best model is BSPL")
+            else:
+                print(f"Running Twinkle-MultiNest for {event} because best simple chi2/dof > {CHI2_THRESHOLD:g}")
             multinest_log = LOGS_DIR / f"{event}_multinest_twinkle.log"
             twinkle_env = base_env.copy()
             twinkle_env.update(
