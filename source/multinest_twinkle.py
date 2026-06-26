@@ -274,6 +274,7 @@ def main():
     parser.add_argument("--evidence-tolerance", type=float, default=float(os.environ.get("MULTINEST_EVIDENCE_TOL", "0.5")))
     parser.add_argument("--sampling-efficiency", type=float, default=float(os.environ.get("MULTINEST_SAMPLING_EFF", "0.3")))
     parser.add_argument("--max-points", type=int, default=int(os.environ.get("MULTINEST_MAX_POINTS", "0")))
+    parser.add_argument("--max-iter", type=int, default=200000, help="Maximum number of MultiNest iterations/samples")
     parser.add_argument("--twinkle-device", type=int, default=int(os.environ.get("TWINKLE_DEVICE", "0")))
     parser.add_argument("--twinkle-n-stream", type=int, default=int(os.environ.get("TWINKLE_N_STREAM", "1")))
     parser.add_argument("--twinkle-reltol", type=float, default=float(os.environ.get("TWINKLE_RELTOL", "1e-4")))
@@ -371,6 +372,7 @@ def main():
         n_live_points=args.n_live,
         evidence_tolerance=args.evidence_tolerance,
         sampling_efficiency=args.sampling_efficiency,
+        max_iter=args.max_iter,
     )
 
     analyzer = pymultinest.Analyzer(n_params=ndim, outputfiles_basename=basename)
