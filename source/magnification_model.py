@@ -33,7 +33,8 @@ _twinkle_obj = None
 _twinkle_n_srcs = 0
 
 
-def _load_ephemeris():
+def ensure_ephemeris_loaded():
+    """Load ephemeris before any JAX trace (must not run inside jit/vmap/grad)."""
     global _ephemeris_table, _eph_object
     if _eph_object is not None:
         return _eph_object
@@ -72,7 +73,7 @@ def _parallax_offsets(t, params):
         tref=t_0_par_ephem,
         RA=params["coords"][0],
         Dec=params["coords"][1],
-        eph=_load_ephemeris(),
+        eph=_eph_object,
     )
     return compute_parallax_ephem(t_ephem, params["pi_E_N"], params["pi_E_E"], proj)
 

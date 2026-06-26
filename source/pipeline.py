@@ -7,12 +7,18 @@ import jax
 import jax.numpy as jnp
 
 from initial_conditions import InitialConditions
-from magnification_model import magnification
+from magnification_model import ensure_ephemeris_loaded, magnification
 from optimization import build_optimize_loop, get_eval_metrics
+
+
+_PARALLAX_MODEL_NAMES = frozenset({"PSPL+Parallax", "FSPL+Parallax"})
 
 
 def run_pipeline(files, out_dir, data_loader, models, max_len):
     """Main pipeline execution for a batch of light curve files."""
+    if any(m.name in _PARALLAX_MODEL_NAMES for m in models):
+        ensure_ephemeris_loaded()
+
     optimizer = optax.adam(learning_rate=1e-2)
     n_steps = 10_000
     min_chi2_improvement = 1e-5
