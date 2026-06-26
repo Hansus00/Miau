@@ -94,6 +94,7 @@ class InitialConditions:
             "PSPL+Parallax": self._init_pspl_parallax,
             "FSPL+Parallax": self._init_fspl_parallax,
             "BSPL": self._init_bspl,
+            "BSPL+Parallax": self._init_bspl_parallax,
             "FSBL": self._init_fsbl,
         }
 

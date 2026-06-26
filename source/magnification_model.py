@@ -97,13 +97,30 @@ def _fspl_parallax_magnification(t, params):
     return _fspl_obj.A(u, params["rho"])
 
 
+def _point_lens_from_tau_beta(tau, beta):
+    u = jnp.sqrt(beta**2 + tau**2)
+    return (u**2 + 2) / (u * jnp.sqrt(u**2 + 4))
+
+
 def _bspl_magnification(t, params):
     tau_1 = (t - params["t_0_1"]) / params["t_E"]
     tau_2 = (t - params["t_0_2"]) / params["t_E"]
-    u_1 = jnp.sqrt(params["u_0_1"] ** 2 + tau_1**2)
-    u_2 = jnp.sqrt(params["u_0_2"] ** 2 + tau_2**2)
-    A_1 = (u_1**2 + 2) / (u_1 * jnp.sqrt(u_1**2 + 4))
-    A_2 = (u_2**2 + 2) / (u_2 * jnp.sqrt(u_2**2 + 4))
+    A_1 = _point_lens_from_tau_beta(tau_1, params["u_0_1"])
+    A_2 = _point_lens_from_tau_beta(tau_2, params["u_0_2"])
+    return (A_1 + params["q_f"] * A_2) / (1 + params["q_f"])
+
+
+def _bspl_parallax_magnification(t, params):
+    """Binary-source point-lens model with Roman ephemeris parallax.
+
+    The same parallax displacement is applied to both source trajectories,
+    because the lens-observer geometry is common to the two source components.
+    """
+    d_tau, d_beta = _parallax_offsets(t, params)
+    tau_1 = (t - params["t_0_1"]) / params["t_E"] + d_tau
+    tau_2 = (t - params["t_0_2"]) / params["t_E"] + d_tau
+    A_1 = _point_lens_from_tau_beta(tau_1, params["u_0_1"] + d_beta)
+    A_2 = _point_lens_from_tau_beta(tau_2, params["u_0_2"] + d_beta)
     return (A_1 + params["q_f"] * A_2) / (1 + params["q_f"])
 
 
@@ -167,6 +184,7 @@ _MAGNIFICATION_FUNCS = {
     "fspl": _fspl_magnification,
     "fspl_parallax": _fspl_parallax_magnification,
     "bspl": _bspl_magnification,
+    "bspl_parallax": _bspl_parallax_magnification,
     "fsbl": _fsbl_magnification,
     "fsbl_grid": _fsbl_grid_magnification,
 }
@@ -206,6 +224,7 @@ _PRIOR_FUNCS = {
     "fspl": _prior_fspl,
     "fspl_parallax": lambda p: _prior_fspl(p) + _prior_parallax(p),
     "bspl": _prior_bspl,
+    "bspl_parallax": lambda p: _prior_bspl(p) + _prior_parallax(p),
     "fsbl": _prior_fsbl,
 }
 

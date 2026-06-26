@@ -11,7 +11,7 @@ from magnification_model import ensure_ephemeris_loaded, magnification
 from optimization import build_optimize_loop, get_eval_metrics
 
 
-_PARALLAX_MODEL_NAMES = frozenset({"PSPL+Parallax", "FSPL+Parallax"})
+_PARALLAX_MODEL_NAMES = frozenset({"PSPL+Parallax", "FSPL+Parallax", "BSPL+Parallax"})
 
 
 def run_pipeline(files, out_dir, data_loader, models, max_len):

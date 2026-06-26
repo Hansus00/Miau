@@ -191,6 +191,47 @@ class BSPL(ModelBase):
         }
 
 
+class BSPLParallax(ModelBase):
+    """Binary-source point-lens model with Roman ephemeris parallax."""
+
+    def __init__(self):
+        super().__init__(
+            "BSPL+Parallax",
+            [
+                "t_0_1",
+                "t_0_2",
+                "t_E",
+                "u_0_1",
+                "u_0_2",
+                "q_f",
+                "pi_E_N",
+                "pi_E_E",
+            ],
+        )
+
+    def setup_data(self, data, prev_results):
+        if "BSPL" not in prev_results:
+            raise ValueError("BSPL+Parallax requires BSPL to be run first.")
+        # Use the single-lens reference time, consistent with PSPL+Parallax.
+        data["t_0_par"] = prev_results["PSPL"]["dict"]["t_0"]
+        return data
+
+    def to_dict(self, params, data):
+        return {
+            "model": "bspl_parallax",
+            "t_0_1": params[0] + data["t_0_shift"],
+            "t_0_2": params[1] + data["t_0_shift"],
+            "t_E": jnp.exp(params[2]),
+            "u_0_1": params[3],
+            "u_0_2": params[4],
+            "q_f": jnp.exp(params[5]),
+            "pi_E_N": params[6],
+            "pi_E_E": params[7],
+            "t_0_par": data["t_0_par"],
+            "coords": data["coords"],
+        }
+
+
 class FSBL(ModelBase):
     """
     Finite Source Binary Lens Model.

@@ -284,6 +284,54 @@ def _build_maps(model_name: str) -> Tuple[
         ]
         return pack, unpack, maps
 
+    if model_name == "BSPL+Parallax":
+        def pack(section, _ctx):
+            return jnp.array(
+                [
+                    section["t_0_1"],
+                    section["t_0_2"],
+                    _safe_log(section["t_E"]),
+                    section["u_0_1"],
+                    section["u_0_2"],
+                    _safe_log(section["q_f"]),
+                    section["pi_E_N"],
+                    section["pi_E_E"],
+                    section["Fs"],
+                    section["Fb"],
+                ],
+                dtype=jnp.float64,
+            )
+
+        def unpack(theta, ctx):
+            return {
+                "model": "bspl_parallax",
+                "t_0_1": theta[0],
+                "t_0_2": theta[1],
+                "t_E": jnp.exp(theta[2]),
+                "u_0_1": theta[3],
+                "u_0_2": theta[4],
+                "q_f": jnp.exp(theta[5]),
+                "pi_E_N": theta[6],
+                "pi_E_E": theta[7],
+                "Fs": theta[8],
+                "Fb": theta[9],
+                "t_0_par": ctx["t_0_par"],
+                "coords": ctx["coords"],
+            }
+
+        maps = [
+            FisherParamMap("t0", 0, _sigma_linear),
+            FisherParamMap("t0_source2", 1, _sigma_linear),
+            FisherParamMap("tE", 2, _sigma_log),
+            FisherParamMap("u0", 3, _sigma_linear),
+            FisherParamMap("u0_source2", 4, _sigma_linear),
+            FisherParamMap("flux_ratio", 5, _sigma_log),
+            FisherParamMap("piEN", 6, _sigma_linear),
+            FisherParamMap("piEE", 7, _sigma_linear),
+            FisherParamMap("F0_B", 9, _sigma_linear),
+        ]
+        return pack, unpack, maps
+
     if model_name == "FSBL":
         def pack(section, _ctx):
             return jnp.array(
@@ -371,6 +419,7 @@ def fisher_submission_uncertainties(
         "PSPL+Parallax",
         "FSPL+Parallax",
         "BSPL",
+        "BSPL+Parallax",
         "FSBL",
     }:
         return None
@@ -429,7 +478,7 @@ def fisher_submission_uncertainties(
         if math.isfinite(sigma) and sigma > 0.0:
             out[spec.submission_key] = sigma
 
-    if model_name == "BSPL" and "flux_ratio" in section:
+    if model_name in {"BSPL", "BSPL+Parallax"} and "q_f" in section:
         qf = float(section["q_f"])
         fs = float(section["Fs"])
         if qf > -0.999999 and fs > 0.0:
