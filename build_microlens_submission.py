@@ -820,13 +820,12 @@ def select_by_aic(rows: List[Dict[str, Any]], delta_aic: float = 2.0) -> List[Di
             delta = float(row["_aic"]) - min_aic
             rel_prob = math.exp(-0.5 * delta) / weight_sum if weight_sum > 0.0 else 1.0
             row = dict(row)
-            row["aic"] = float(row["_aic"])
             row["relative_probability"] = rel_prob
             row["is_active"] = True
             old_notes = row.get("notes", "")
             row["notes"] = (
                 f"{old_notes} Selected by AIC (rank {rank}/{len(competitive)}; "
-                f"AIC={row['aic']:.6g}, ΔAIC={delta:.6g} vs best in source)."
+                f"AIC={float(row['_aic']):.6g}, ΔAIC={delta:.6g} vs best in source)."
             ).strip()
             selected.append(row)
 
@@ -872,7 +871,6 @@ def write_csv(rows: List[Dict[str, Any]], out_csv: Path) -> None:
         "F0_S1",
         "F0_S2",
         "log_likelihood",
-        "aic",
         "n_data_points",
         "relative_probability",
         "is_active",
