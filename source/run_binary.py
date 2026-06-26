@@ -17,6 +17,8 @@ SIMPLE_RESULTS_DIR = RESULTS_DIR / "optax_results"
 LOGS_DIR = REPO_ROOT / "logs"
 SIMPLE_SUFFIX = "_simple"
 MULTINEST_SUFFIX = "_multinest_FSBL_from_FSPL"
+CHI2_THRESHOLD = 1.0
+
 
 def _event_files() -> list[Path]:
     return sorted(DATA_DIR.glob("*.csv"))
@@ -121,38 +123,48 @@ def main() -> int:
         print(f"Best simple model for {event} = {best_model or 'unknown'}")
         print(f"Best simple chi2/dof for {event} = {best_chi2_dof}")
 
-        multinest_log = LOGS_DIR / f"{event}_multinest_twinkle.log"
-        twinkle_env = base_env.copy()
-        twinkle_env.update(
-            {
-                "MN_PSPL_T0_WIDTH_TE": "5",
-                "MN_PSPL_TE_HI_FACTOR": "3",
-                "MN_U0_MIN": "0",
-                "MN_U0_MAX": "4",
-                "TWINKLE_PYTHON_DIR": os.environ.get("TWINKLE_PYTHON_DIR", str(Path.home() / "Twinkle" / "python")),
-            }
+        should_run_multinest = (
+            (math.isfinite(best_chi2_dof) and best_chi2_dof > CHI2_THRESHOLD)
+            or best_model == "BSPL"
         )
-        multinest_cmd = [
-            sys.executable,
-            "source/multinest_twinkle.py",
-            "--data-file",
-            str(event_file),
-            "--params-file",
-            str(params_file),
-            "--out-dir",
-            str(multinest_out),
-            "--prefer-single-lens",
-            "FSPL",
-            "--n-live",
-            "100",
-            "--max-points",
-            "500",
-            "--max-iter",
-            "200000",
-        ]
-        multinest_rc = _tee_run(multinest_cmd, multinest_log, twinkle_env)
-        if multinest_rc != 0:
-            print(f"Twinkle-MultiNest failed for {event} with exit code {multinest_rc}")
+
+        if should_run_multinest:
+            if best_model == "BSPL" and not (math.isfinite(best_chi2_dof) and best_chi2_dof > CHI2_THRESHOLD):
+                print(f"Running Twinkle-MultiNest for {event} because best model is BSPL")
+            else:
+                print(f"Running Twinkle-MultiNest for {event} because best simple chi2/dof > {CHI2_THRESHOLD:g}")
+            multinest_log = LOGS_DIR / f"{event}_multinest_twinkle.log"
+            twinkle_env = base_env.copy()
+            twinkle_env.update(
+                {
+                    "MN_PSPL_T0_WIDTH_TE": "5",
+                    "MN_PSPL_TE_HI_FACTOR": "3",
+                    "MN_U0_MIN": "0",
+                    "MN_U0_MAX": "4",
+                    "TWINKLE_PYTHON_DIR": os.environ.get("TWINKLE_PYTHON_DIR", str(Path.home() / "Twinkle" / "python")),
+                }
+            )
+            multinest_cmd = [
+                sys.executable,
+                "source/multinest_twinkle.py",
+                "--data-file",
+                str(event_file),
+                "--params-file",
+                str(params_file),
+                "--out-dir",
+                str(multinest_out),
+                "--prefer-single-lens",
+                "FSPL",
+                "--n-live",
+                "100",
+                "--max-points",
+                "500",
+            ]
+            multinest_rc = _tee_run(multinest_cmd, multinest_log, twinkle_env)
+            if multinest_rc != 0:
+                print(f"Twinkle-MultiNest failed for {event} with exit code {multinest_rc}")
+        else:
+            print(f"Skipping MultiNest for {event} because best simple chi2/dof <= {CHI2_THRESHOLD:g}")
 
     return 0
 
