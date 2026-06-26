@@ -7,3 +7,4 @@ results/
 .so
 */*.so
 *.log
+/rmdc26_submission

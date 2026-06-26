@@ -7,7 +7,7 @@ import jax
 jax.config.update("jax_enable_x64", True)
 
 from data_loader import DataLoader
-from models import BSPL, BSPLParallax, FSBL, FSPL, FSPLParallax, PSPL, Parallax
+from models import BSPL, FSBL, FSPL, FSPLParallax, PSPL, Parallax
 from pipeline import run_pipeline
 
 
@@ -18,7 +18,6 @@ MODEL_REGISTRY = {
     "Parallax": Parallax,
     "FSPL+Parallax": FSPLParallax,
     "BSPL": BSPL,
-    "BSPL+Parallax": BSPLParallax,
     "FSBL": FSBL,
 }
 
@@ -56,8 +55,8 @@ def main():
     parser.add_argument("--out-dir", default=None)
     parser.add_argument(
         "--models",
-        default="PSPL,FSPL,PSPL+Parallax,FSPL+Parallax,BSPL,BSPL+Parallax",
-        help="Comma-separated model list. Example: PSPL,FSPL,BSPL,BSPL+Parallax,FSBL",
+        default="PSPL,FSPL,PSPL+Parallax,FSPL+Parallax,BSPL",
+        help="Comma-separated model list. Example: PSPL,FSPL,BSPL,FSBL",
     )
     parser.add_argument("--max-len", type=int, default=46_208)
     parser.add_argument("--coord-file", default="data/coords.csv")
