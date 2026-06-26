@@ -8,6 +8,10 @@ optimizer in source/magnification_model.py. For each event it keeps every model
 from the best result source whose AIC lies within --aic-delta of the minimum
 (default 2). Use --all-models to export every fit without selection.
 
+Fisher-matrix uncertainties (uncertainty_method=fisher_matrix) are attached by
+default for supported models and written to parameter_uncertainties in the CSV /
+microlens-submit solution JSON.
+
 Typical use from project root:
 
   python build_microlens_submission.py \
@@ -37,6 +41,10 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
+
+SOURCE_DIR = Path(__file__).resolve().parent / "source"
+if str(SOURCE_DIR) not in sys.path:
+    sys.path.insert(0, str(SOURCE_DIR))
 
 
 # -----------------------------------------------------------------------------
@@ -479,6 +487,81 @@ def n_points(section: Dict[str, Any], model_name: Optional[str] = None) -> Optio
     return None
 
 
+def add_uncertainty_metadata(
+    row: Dict[str, Any],
+    uncertainties: Optional[Dict[str, float]],
+    confidence_level: float = 0.68,
+) -> None:
+    if not uncertainties:
+        return
+    row["parameter_uncertainties"] = json.dumps(uncertainties)
+    row["uncertainty_method"] = "fisher_matrix"
+    row["confidence_level"] = confidence_level
+
+
+def load_fisher_event_data(
+    event_id: str,
+    input_dir: Path,
+    coord_file: str,
+    max_len: int,
+) -> Optional[Dict[str, Any]]:
+    from data_loader import DataLoader
+    from initial_conditions import InitialConditions
+
+    csv_path = input_dir / f"{event_id}.csv"
+    if not csv_path.exists():
+        matches = sorted(input_dir.glob(f"*{event_id}*.csv"))
+        if not matches:
+            return None
+        csv_path = matches[0]
+    try:
+        loader = DataLoader(coord_file=coord_file)
+        raw = loader.load_event(str(csv_path))
+        init = InitialConditions(raw)
+        return init.get_processed_data(max_len=max_len)
+    except Exception:
+        return None
+
+
+def attach_fisher_uncertainties(
+    rows: List[Dict[str, Any]],
+    *,
+    input_dir: Path,
+    coord_file: str,
+    max_len: int,
+    uncertainty_max_points: int,
+    confidence_level: float,
+) -> int:
+    from fisher_uncertainties import fisher_submission_uncertainties
+
+    event_cache: Dict[str, Optional[Dict[str, Any]]] = {}
+    n_attached = 0
+    for row in rows:
+        model_name = row.get("_model_name")
+        section = row.get("_section")
+        if not model_name or not section:
+            continue
+        event_id = row["event_id"]
+        if event_id not in event_cache:
+            event_cache[event_id] = load_fisher_event_data(
+                event_id, input_dir, coord_file, max_len
+            )
+        data = event_cache[event_id]
+        if data is None:
+            continue
+        unc = fisher_submission_uncertainties(
+            model_name,
+            section,
+            data,
+            confidence_level=confidence_level,
+            max_points=uncertainty_max_points,
+        )
+        if unc:
+            add_uncertainty_metadata(row, unc, confidence_level=confidence_level)
+            n_attached += 1
+    return n_attached
+
+
 def safe_alias(model_name: str, source_tag: str) -> str:
     alias = model_name.replace("+", "_plus_").replace(" ", "_")
     alias = alias.replace("/", "_").replace("-", "_")
@@ -734,6 +817,7 @@ def build_rows(
             if row is not None:
                 row["_model_name"] = model_name
                 row["_source_tag"] = source_tag
+                row["_section"] = section
                 rows.append(row)
 
     # PyMultiNest FSBL outputs, e.g. results/*multinest_FSBL_from_FSPL*/mn_stats.dat.
@@ -752,6 +836,7 @@ def build_rows(
                 row["notes"] = old_notes + " Maximum-likelihood FSBL parameters imported from MultiNest output."
                 row["_model_name"] = "FSBL"
                 row["_source_tag"] = source_tag
+                row["_section"] = section
                 rows.append(row)
 
     return rows
@@ -840,11 +925,120 @@ def select_by_aic(rows: List[Dict[str, Any]], delta_aic: float = 2.0) -> List[Di
 
 
 def strip_internal_row_keys(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    internal = {"_aic", "_neg_lnprob", "_model_name", "_source_tag"}
+    internal = {"_aic", "_neg_lnprob", "_model_name", "_source_tag", "_section"}
     cleaned: List[Dict[str, Any]] = []
     for row in rows:
         cleaned.append({k: v for k, v in row.items() if k not in internal})
     return cleaned
+
+
+def _parse_model_tags(model_tags_value: Any) -> Tuple[str, List[str]]:
+    tags = json.loads(model_tags_value) if isinstance(model_tags_value, str) else model_tags_value
+    if not isinstance(tags, list):
+        raise ValueError("model_tags must be a JSON list")
+    allowed = {"1S1L", "1S2L", "2S1L", "2S2L", "1S3L", "2S3L", "other"}
+    hoe = []
+    model_type = None
+    for tag in tags:
+        if tag in allowed:
+            if model_type is not None:
+                raise ValueError("multiple model types in model_tags")
+            model_type = tag
+        else:
+            hoe.append(tag)
+    if model_type is None:
+        raise ValueError("no model type in model_tags")
+    return model_type, hoe
+
+
+def _row_submission_parameters(row: Dict[str, Any]) -> Dict[str, Any]:
+    skip = {
+        "event_id",
+        "solution_id",
+        "solution_alias",
+        "model_tags",
+        "bands",
+        "notes",
+        "parameters",
+        "parameter_uncertainties",
+        "physical_parameters",
+        "physical_parameter_uncertainties",
+        "uncertainty_method",
+        "confidence_level",
+        "log_likelihood",
+        "relative_probability",
+        "n_data_points",
+        "is_active",
+        "creation_timestamp",
+    }
+    params: Dict[str, Any] = {}
+    for key, value in row.items():
+        if key in skip or key.startswith("_"):
+            continue
+        if value is None or (isinstance(value, str) and not value.strip()):
+            continue
+        if isinstance(value, (int, float)):
+            params[key] = float(value)
+        elif isinstance(value, str):
+            try:
+                params[key] = float(value)
+            except ValueError:
+                params[key] = value
+        else:
+            params[key] = value
+    return params
+
+
+def import_rows_with_microlens_api(
+    rows: List[Dict[str, Any]],
+    submission_dir: Path,
+    *,
+    validate: bool = True,
+) -> None:
+    """Import rows via microlens-submit Python API (supports uncertainty metadata)."""
+    from microlens_submit.utils import load
+
+    submission_dir.mkdir(parents=True, exist_ok=True)
+    sub = load(str(submission_dir))
+
+    for row in rows:
+        model_type, higher_order = _parse_model_tags(row["model_tags"])
+        params = _row_submission_parameters(row)
+        event = sub.get_event(row["event_id"])
+        sol = event.add_solution(model_type, params)
+        if row.get("solution_alias"):
+            sol.alias = row["solution_alias"]
+        if higher_order:
+            sol.higher_order_effects = higher_order
+        if row.get("bands"):
+            try:
+                sol.bands = json.loads(row["bands"]) if isinstance(row["bands"], str) else row["bands"]
+            except json.JSONDecodeError:
+                pass
+        if row.get("notes"):
+            sol.set_notes(str(row["notes"]), submission_dir, convert_escapes=True)
+        if row.get("log_likelihood") is not None:
+            sol.log_likelihood = float(row["log_likelihood"])
+        if row.get("relative_probability") is not None:
+            sol.relative_probability = float(row["relative_probability"])
+        if row.get("n_data_points") is not None:
+            sol.n_data_points = int(round(float(row["n_data_points"])))
+        if row.get("is_active") is not None:
+            sol.is_active = bool(row["is_active"])
+        if row.get("parameter_uncertainties"):
+            unc = row["parameter_uncertainties"]
+            sol.parameter_uncertainties = (
+                json.loads(unc) if isinstance(unc, str) else unc
+            )
+        if row.get("uncertainty_method"):
+            sol.uncertainty_method = str(row["uncertainty_method"])
+        if row.get("confidence_level") is not None:
+            sol.confidence_level = float(row["confidence_level"])
+        if row.get("t_ref") is not None:
+            sol.t_ref = float(row["t_ref"])
+        if validate:
+            sol.run_validation()
+    sub.save()
 
 
 def write_csv(rows: List[Dict[str, Any]], out_csv: Path) -> None:
@@ -871,8 +1065,11 @@ def write_csv(rows: List[Dict[str, Any]], out_csv: Path) -> None:
         "F0_S1",
         "F0_S2",
         "log_likelihood",
-        "n_data_points",
         "relative_probability",
+        "n_data_points",
+        "parameter_uncertainties",
+        "uncertainty_method",
+        "confidence_level",
         "is_active",
         "notes",
     ]
@@ -893,6 +1090,7 @@ def run_cmd(cmd: List[str], cwd: Optional[Path] = None, check: bool = True) -> s
 
 def maybe_run_microlens_submit(
     *,
+    rows: List[Dict[str, Any]],
     csv_path: Path,
     submission_dir: Path,
     team_name: str,
@@ -911,11 +1109,8 @@ def maybe_run_microlens_submit(
     submission_dir.mkdir(parents=True, exist_ok=True)
 
     init_cmd = [exe, "init", "--team-name", team_name, "--tier", tier]
-    # CLI options may differ slightly between versions. We do repo metadata by
-    # JSON patch below as a robust fallback.
     run_cmd(init_cmd, cwd=submission_dir)
 
-    # Patch top-level metadata robustly.
     sub_json = submission_dir / "submission.json"
     if sub_json.exists():
         data = json.loads(sub_json.read_text(encoding="utf-8"))
@@ -929,15 +1124,14 @@ def maybe_run_microlens_submit(
     data.setdefault("hardware_info", {"cpu": "unknown", "ram_gb": None})
     sub_json.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
-    # Import CSV. Path should be absolute because cwd=submission_dir.
-    run_cmd([exe, "import-solutions", str(csv_path.resolve()), "--validate"], cwd=submission_dir)
+    import_rows_with_microlens_api(rows, submission_dir, validate=True)
+    print(f"Imported {len(rows)} solution(s) via microlens-submit Python API.")
 
     if generate_dossier:
         run_cmd([exe, "generate-dossier"], cwd=submission_dir, check=False)
 
     if export_zip is not None:
         export_zip = export_zip.resolve()
-        # Try modern command first; fallback to older style if needed.
         try:
             run_cmd([exe, "export-submission", str(export_zip)], cwd=submission_dir)
         except subprocess.CalledProcessError:
@@ -980,6 +1174,26 @@ def main() -> None:
     ap.add_argument("--git-dir", default=None, help="Optional local git directory.")
     ap.add_argument("--no-dossier", action="store_true", help="Skip dossier generation.")
     ap.add_argument("--export-zip", default="final_submission.zip", help="Output submission zip path, if running microlens-submit.")
+    ap.add_argument("--input-dir", default="data/data_F146", help="Light-curve CSV directory for Fisher uncertainties.")
+    ap.add_argument("--coord-file", default="data/coords.csv", help="Event coordinates for parallax Fisher errors.")
+    ap.add_argument("--max-len", type=int, default=46_208, help="Max points when loading light curves for Fisher errors.")
+    ap.add_argument(
+        "--no-uncertainties",
+        action="store_true",
+        help="Skip Fisher-matrix parameter_uncertainties in the submission output.",
+    )
+    ap.add_argument(
+        "--uncertainty-max-points",
+        type=int,
+        default=2048,
+        help="Subsample light-curve points when evaluating the Fisher matrix.",
+    )
+    ap.add_argument(
+        "--confidence-level",
+        type=float,
+        default=0.68,
+        help="Gaussian confidence level for reported Fisher uncertainties (default: 0.68).",
+    )
     args = ap.parse_args()
 
     roots = [Path(x) for x in args.results]
@@ -1001,6 +1215,17 @@ def main() -> None:
             f"from {n_before} candidate(s); {n_multi} event(s) have multiple solutions."
         )
 
+    if not args.no_uncertainties:
+        n_unc = attach_fisher_uncertainties(
+            rows,
+            input_dir=Path(args.input_dir),
+            coord_file=args.coord_file,
+            max_len=args.max_len,
+            uncertainty_max_points=args.uncertainty_max_points,
+            confidence_level=args.confidence_level,
+        )
+        print(f"Attached Fisher-matrix uncertainties to {n_unc} row(s).")
+
     rows = strip_internal_row_keys(rows)
 
     if not rows:
@@ -1020,6 +1245,7 @@ def main() -> None:
 
     if args.run_microlens_submit:
         maybe_run_microlens_submit(
+            rows=rows,
             csv_path=out_csv,
             submission_dir=Path(args.submission_dir),
             team_name=args.team_name,
