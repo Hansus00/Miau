@@ -1,8 +1,8 @@
 """CPU MultiNest posterior/refinement for FSBL candidates.
 
 This script is designed to be launched as a separate process while Twinkle keeps
-using the GPU in the parent process.  It forces JAX/microlux to CPU before any
-JAX import.
+using the GPU in the parent process.  It forces Twinkle/JAX work onto CPU before
+any JAX import.
 """
 from __future__ import annotations
 
@@ -13,20 +13,32 @@ import re
 from pathlib import Path
 from typing import Dict, Tuple
 
-# Critical: keep this before importing jax/microlux.
-os.environ.setdefault("JAX_PLATFORMS", "cpu")
-os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
 
 import numpy as np
 import pandas as pd
 
 try:
-    import jax
-    jax.config.update("jax_enable_x64", True)
-    import jax.numpy as jnp
-    from microlux import binary_mag
+    from twinkle_grid_search import (
+        TwinkleGridConfig,
+        import_twinkle_module,
+        make_twinkle_engine,
+        trajectory_xy,
+    )
 except Exception as exc:  # pragma: no cover
-    raise RuntimeError("Could not import CPU microlux/JAX. Check requirements.") from exc
+    raise RuntimeError("Could not import Twinkle grid search helpers. Check requirements.") from exc
+
+
+_TWINKLE_ENGINE = None
+
+
+def _get_twinkle_engine(n_srcs: int):
+    global _TWINKLE_ENGINE
+    if _TWINKLE_ENGINE is None or getattr(_TWINKLE_ENGINE, "_miau_n_srcs", None) != n_srcs:
+        cfg = TwinkleGridConfig.from_env()
+        twinkle = import_twinkle_module()
+        _TWINKLE_ENGINE = make_twinkle_engine(twinkle, n_srcs, cfg)
+        _TWINKLE_ENGINE._miau_n_srcs = n_srcs
+    return _TWINKLE_ENGINE
 
 
 def load_lightcurve_csv(path: str | Path) -> Dict[str, np.ndarray]:
@@ -112,14 +124,20 @@ def seed_from_pspl_fspl(params_file: str | Path, prefer: str = "FSPL") -> dict:
     pspl = sections.get("PSPL", {})
     fspl = sections.get("FSPL", {})
 
-    t0 = float(base.get("t_0", pspl.get("t_0", fspl.get("t_0"))))
-    tE = float(base.get("t_E", pspl.get("t_E", fspl.get("t_E"))))
-    u0 = float(base.get("u_0", pspl.get("u_0", fspl.get("u_0", 0.1))))
+    def pick_float(*values: float | None, default: float) -> float:
+        for value in values:
+            if value is not None:
+                return float(value)
+        return float(default)
+
+    t0 = pick_float(base.get("t_0"), pspl.get("t_0"), fspl.get("t_0"), default=0.0)
+    tE = pick_float(base.get("t_E"), pspl.get("t_E"), fspl.get("t_E"), default=1.0)
+    u0 = pick_float(base.get("u_0"), pspl.get("u_0"), fspl.get("u_0"), default=0.1)
     rho = float(fspl.get("rho", 1.0e-3))
     rho = min(max(rho, 1.0e-5), 0.1)
 
     return {
-        "chi2": float(base.get("Chi2", np.inf)),
+        "chi2": pick_float(base.get("Chi2"), default=np.inf),
         "Fs": float(base.get("Fs", 1.0)),
         "Fb": float(base.get("Fb", 0.0)),
         "t0": t0,
@@ -160,18 +178,15 @@ def weighted_linear_fit(A, y, sig) -> Tuple[float, float, float]:
 
 def fsbl_mag_cpu(t, theta):
     t0, log_tE, u0, log_s, log_q, log_rho, alpha = theta
-    tt = jnp.asarray(t, dtype=jnp.float64)
-    A = binary_mag(
-        float(t0),
-        float(u0),
-        float(np.exp(log_tE)),
-        float(np.exp(log_rho)),
-        float(np.exp(log_q)),
-        float(np.exp(log_s)),
-        float(alpha),
-        tt,
-    )
-    return np.asarray(A, dtype=float)
+    tt = np.asarray(t, dtype=np.float64)
+    alpha_deg = float(alpha)
+    x, y = trajectory_xy(tt, float(t0), float(np.exp(log_tE)), float(u0), alpha_deg)
+    engine = _get_twinkle_engine(len(tt))
+    mag = np.empty(len(tt), dtype=np.float64)
+    engine.set_params(float(np.exp(log_s)), float(np.exp(log_q)), float(np.exp(log_rho)), x, y)
+    engine.run()
+    engine.return_mag_to(mag)
+    return mag
 
 
 def make_prior_bounds(seed: dict, t: np.ndarray, broad_binary: bool = False) -> np.ndarray:
