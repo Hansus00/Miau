@@ -96,7 +96,10 @@ def parse_params_txt(path: Path) -> Dict[str, Dict[str, Any]]:
 # Parsing PyMultiNest FSBL output directories
 # -----------------------------------------------------------------------------
 
-MN_THETA_NAMES = ["t0", "log_tE", "u0", "log_s", "log_q", "log_rho", "alpha_deg"]
+MN_THETA_NAMES_FSBL = ["t0", "log_tE", "u0", "log_s", "log_q", "log_rho", "alpha_deg"]
+MN_THETA_NAMES_FSBL_PARALLAX = [
+    "t0", "log_tE", "u0", "log_s", "log_q", "log_rho", "alpha_deg", "pi_E_N", "pi_E_E"
+]
 
 
 def infer_event_id_from_multinest_dir(path: Path) -> str:
@@ -109,6 +112,21 @@ def infer_event_id_from_multinest_dir(path: Path) -> str:
     if "_multinest" in name:
         return name.split("_multinest", 1)[0]
     return name
+
+
+def infer_multinest_model_name(path: Path, section: Optional[Dict[str, Any]] = None) -> str:
+    """Infer whether a MultiNest result directory contains FSBL or FSBL+Parallax."""
+    name = path.name.lower()
+    if "parallax" in name or "paral" in name:
+        return "FSBL+Parallax"
+    if section is not None and (
+        as_float(section, "pi_E_N") is not None
+        or as_float(section, "pi_E_E") is not None
+        or as_float(section, "piEN") is not None
+        or as_float(section, "piEE") is not None
+    ):
+        return "FSBL+Parallax"
+    return "FSBL"
 
 
 def parse_multinest_best_fit_txt(path: Path) -> Dict[str, Any]:
@@ -145,6 +163,16 @@ def parse_multinest_best_fit_txt(path: Path) -> Dict[str, Any]:
         section["u_0"] = raw["u0"]
     if as_float(raw, "alpha_deg") is not None:
         section["alpha_deg"] = raw["alpha_deg"]
+
+    # Parallax components, if this is an FSBL+Parallax MultiNest run.
+    for src_key, dst_key in [
+        ("pi_E_N", "pi_E_N"),
+        ("pi_E_E", "pi_E_E"),
+        ("piEN", "pi_E_N"),
+        ("piEE", "pi_E_E"),
+    ]:
+        if as_float(raw, src_key) is not None:
+            section[dst_key] = raw[src_key]
 
     # Prefer explicitly written physical values. Fall back to exponentiated logs.
     if as_float(raw, "tE") is not None:
@@ -183,29 +211,20 @@ def _extract_floats_from_line(line: str) -> List[float]:
 
 def parse_mn_stats_maxlike(path: Path, ndim: int = 7) -> Dict[str, Any]:
     """
-    Parse maximum-likelihood nonlinear FSBL parameters from mn_stats.dat.
+    Parse maximum-likelihood nonlinear FSBL/FSBL+Parallax parameters from mn_stats.dat.
 
-    MultiNest/PyMultiNest formats differ slightly. This parser looks for a block
-    containing 'Maximum Likelihood Parameters' and then extracts ndim numerical
-    parameter values. It handles both formats like:
-
-        1   2461854.8
-        2   1.23
-
-    and simple one-value-per-line formats.
-
-    The assumed parameter order is the order used in source/multinest_cpu.py:
+    Parameter order is the one used by our MultiNest scripts:
+      FSBL:
         t0, log_tE, u0, log_s, log_q, log_rho, alpha_deg
-
-    Raw mn_stats.dat does not contain Fs/Fb/chi2. If best_fit.txt is present,
-    parse_multinest_result_dir() will merge those values from there.
+      FSBL+Parallax:
+        t0, log_tE, u0, log_s, log_q, log_rho, alpha_deg, pi_E_N, pi_E_E
     """
     if not path.exists():
         return {}
 
-    text = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+    text_lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
     start = None
-    for i, line in enumerate(text):
+    for i, line in enumerate(text_lines):
         low = line.lower()
         if "maximum" in low and "likelihood" in low and "parameter" in low:
             start = i + 1
@@ -215,10 +234,9 @@ def parse_mn_stats_maxlike(path: Path, ndim: int = 7) -> Dict[str, Any]:
 
     vals: List[float] = []
     expected_index = 1
-    for line in text[start:]:
+    for line in text_lines[start:]:
         low = line.strip().lower()
         if not low:
-            # allow one blank, but stop if we already found values
             if vals:
                 break
             continue
@@ -230,7 +248,7 @@ def parse_mn_stats_maxlike(path: Path, ndim: int = 7) -> Dict[str, Any]:
         if not nums:
             continue
 
-        # Common MultiNest layout: '<index> <value>'
+        # Common MultiNest layout: '<index> <value>'.
         if len(nums) >= 2 and abs(nums[0] - expected_index) < 1e-9:
             vals.append(nums[1])
             expected_index += 1
@@ -254,37 +272,340 @@ def parse_mn_stats_maxlike(path: Path, ndim: int = 7) -> Dict[str, Any]:
         "alpha_deg": theta[6],
         "multinest_source": "mn_stats.dat maximum-likelihood block",
     }
+    if ndim >= 9:
+        section["pi_E_N"] = theta[7]
+        section["pi_E_E"] = theta[8]
     return section
 
 
+def _candidate_multinest_sample_files(path: Path) -> List[Path]:
+    """Return likely posterior sample files written by PyMultiNest/MultiNest."""
+    names = [
+        "mn_post_equal_weights.dat",
+        "mn_equal_weights.dat",
+        "post_equal_weights.dat",
+        "equal_weights.dat",
+    ]
+    candidates: List[Path] = [path / name for name in names]
+    candidates.extend(sorted(path.glob("*post_equal_weights*.dat")))
+    candidates.extend(sorted(path.glob("*equal_weights*.dat")))
+    # Raw MultiNest chain; usually columns are weight, -2logL, parameters...
+    candidates.extend([path / "mn_.txt", path / "mn.txt", path / "mn_.dat"])
+    out: List[Path] = []
+    seen = set()
+    for p in candidates:
+        if p.exists() and p.is_file() and p.resolve() not in seen:
+            seen.add(p.resolve())
+            out.append(p)
+    return out
+
+
+def _load_numeric_table(path: Path) -> Optional[np.ndarray]:
+    try:
+        arr = np.loadtxt(path)
+    except Exception:
+        return None
+    arr = np.asarray(arr, dtype=float)
+    if arr.ndim == 1:
+        arr = arr.reshape(1, -1)
+    if arr.size == 0 or arr.shape[0] < 2:
+        return None
+    return arr
+
+
+def _weighted_quantile(values: np.ndarray, weights: Optional[np.ndarray], qs: List[float]) -> np.ndarray:
+    values = np.asarray(values, dtype=float)
+    good = np.isfinite(values)
+    if weights is not None:
+        weights = np.asarray(weights, dtype=float)
+        good &= np.isfinite(weights) & (weights > 0)
+    values = values[good]
+    if values.size == 0:
+        return np.full(len(qs), np.nan)
+    if weights is None:
+        return np.quantile(values, qs)
+    weights = weights[good]
+    order = np.argsort(values)
+    values = values[order]
+    weights = weights[order]
+    cdf = np.cumsum(weights)
+    if cdf[-1] <= 0:
+        return np.full(len(qs), np.nan)
+    cdf /= cdf[-1]
+    return np.interp(qs, cdf, values)
+
+
+def _theta_samples_from_multinest_file(path: Path, ndim: int) -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
+    """
+    Read theta samples from a MultiNest output file.
+
+    Equal-weight files are assumed to contain parameters in the first ndim columns
+    and optionally logL in the last column. Raw mn_.txt is assumed to contain
+    weight, -2logL, then ndim parameters.
+    """
+    arr = _load_numeric_table(path)
+    if arr is None:
+        return None, None
+
+    name = path.name.lower()
+    if ("equal" in name or "post" in name) and arr.shape[1] >= ndim:
+        return arr[:, :ndim], None
+
+    if arr.shape[1] >= ndim + 2:
+        weights = arr[:, 0]
+        theta = arr[:, 2 : 2 + ndim]
+        return theta, weights
+
+    if arr.shape[1] >= ndim:
+        return arr[:, :ndim], None
+
+    return None, None
+
+
+def _angle_uncertainty_rad(alpha_deg_samples: np.ndarray, weights: Optional[np.ndarray]) -> Optional[float]:
+    """Compute a robust 68% half-width for angular uncertainty, returned in radians."""
+    alpha_rad = np.deg2rad(np.asarray(alpha_deg_samples, dtype=float))
+    good = np.isfinite(alpha_rad)
+    if weights is not None:
+        good &= np.isfinite(weights) & (weights > 0)
+        w = weights[good]
+    else:
+        w = None
+    alpha_rad = alpha_rad[good]
+    if alpha_rad.size < 2:
+        return None
+
+    # Unwrap around the circular mean to avoid artificial jumps at 0/360 deg.
+    if w is None:
+        center = np.angle(np.mean(np.exp(1j * alpha_rad)))
+    else:
+        center = np.angle(np.sum(w * np.exp(1j * alpha_rad)) / np.sum(w))
+    shifted = np.angle(np.exp(1j * (alpha_rad - center))) + center
+    q16, q84 = _weighted_quantile(shifted, w, [0.16, 0.84])
+    sig = 0.5 * (q84 - q16)
+    if math.isfinite(sig) and sig >= 0:
+        return float(sig)
+    return None
+
+
+def _uncertainty_from_samples(values: np.ndarray, weights: Optional[np.ndarray]) -> Optional[float]:
+    q16, q84 = _weighted_quantile(values, weights, [0.16, 0.84])
+    sig = 0.5 * (q84 - q16)
+    if math.isfinite(sig) and sig >= 0:
+        return float(sig)
+    return None
+
+
+def _parse_stats_dict_from_best_fit(path: Path) -> Optional[Dict[str, Any]]:
+    """Parse the Python-dict Stats block written by our MultiNest scripts."""
+    best_fit = path / "best_fit.txt"
+    if not best_fit.exists():
+        return None
+    txt = best_fit.read_text(encoding="utf-8", errors="ignore")
+    marker = "Stats:"
+    idx = txt.find(marker)
+    if idx < 0:
+        return None
+    payload = txt[idx + len(marker):].strip()
+    if not payload:
+        return None
+    try:
+        obj = ast.literal_eval(payload)
+    except Exception:
+        return None
+    return obj if isinstance(obj, dict) else None
+
+
+def _marginal_half_width(marginal: Dict[str, Any]) -> Optional[float]:
+    """Return a 68%-like half-width in the sampled variable."""
+    interval = marginal.get("1sigma")
+    if isinstance(interval, (list, tuple)) and len(interval) == 2:
+        try:
+            lo = float(interval[0])
+            hi = float(interval[1])
+            if math.isfinite(lo) and math.isfinite(hi):
+                return abs(hi - lo) / 2.0
+        except Exception:
+            pass
+    for key in ["sigma", "std", "stdev"]:
+        if key in marginal:
+            try:
+                sig = abs(float(marginal[key]))
+                if math.isfinite(sig):
+                    return sig
+            except Exception:
+                pass
+    return None
+
+
+def _marginal_interval(marginal: Dict[str, Any]) -> Optional[Tuple[float, float]]:
+    interval = marginal.get("1sigma")
+    if isinstance(interval, (list, tuple)) and len(interval) == 2:
+        try:
+            lo = float(interval[0])
+            hi = float(interval[1])
+            if math.isfinite(lo) and math.isfinite(hi):
+                return lo, hi
+        except Exception:
+            pass
+    return None
+
+
+def multinest_stats_uncertainties(path: Path, model_name: str, section: Dict[str, Any]) -> Dict[str, float]:
+    """
+    Fallback uncertainty parser from the Stats dict in best_fit.txt.
+
+    This is less ideal than posterior samples, but useful when only best_fit.txt
+    and mn_stats.dat are kept. MultiNest marginals are in sampled coordinates,
+    so log parameters are transformed back to physical space.
+    """
+    stats = _parse_stats_dict_from_best_fit(path)
+    if not stats:
+        return {}
+    marginals = stats.get("marginals")
+    if not isinstance(marginals, list):
+        return {}
+
+    ndim = 9 if model_name == "FSBL+Parallax" else 7
+    if len(marginals) < ndim:
+        return {}
+
+    unc: Dict[str, float] = {}
+
+    # Direct sampled parameters.
+    for idx, key in [(0, "t0"), (2, "u0")]:
+        sig = _marginal_half_width(marginals[idx])
+        if sig is not None:
+            unc[key] = sig
+
+    # Log-sampled positive parameters.
+    for idx, key, center_key in [
+        (1, "tE", "t_E"),
+        (3, "s", "s"),
+        (4, "q", "q"),
+        (5, "rho", "rho"),
+    ]:
+        interval = _marginal_interval(marginals[idx])
+        if interval is not None:
+            lo, hi = interval
+            sig = 0.5 * abs(math.exp(hi) - math.exp(lo))
+        else:
+            sig_log = _marginal_half_width(marginals[idx])
+            center = as_float(section, center_key)
+            sig = abs(center * sig_log) if (sig_log is not None and center is not None) else None
+        if sig is not None and math.isfinite(sig):
+            unc[key] = float(sig)
+
+    # alpha is submitted in radians, while MultiNest samples alpha_deg.
+    sig_alpha_deg = _marginal_half_width(marginals[6])
+    if sig_alpha_deg is not None:
+        unc["alpha"] = math.radians(sig_alpha_deg)
+
+    if model_name == "FSBL+Parallax":
+        sig_n = _marginal_half_width(marginals[7])
+        sig_e = _marginal_half_width(marginals[8])
+        if sig_n is not None:
+            unc["piEN"] = sig_n
+        if sig_e is not None:
+            unc["piEE"] = sig_e
+
+    return {k: float(v) for k, v in unc.items() if math.isfinite(float(v)) and float(v) >= 0.0}
+
+
+def multinest_posterior_uncertainties(path: Path, model_name: str) -> Dict[str, float]:
+    """
+    Estimate 1-sigma-like parameter_uncertainties from MultiNest posterior samples.
+
+    The output keys match microlens-submit parameter names:
+      FSBL: t0, u0, tE, s, q, alpha, rho
+      FSBL+Parallax: additionally piEN, piEE
+
+    For log-sampled positive parameters we transform samples to physical space
+    before measuring the 16-84 percentile half-width.
+    """
+    ndim = 9 if model_name == "FSBL+Parallax" else 7
+    for sample_file in _candidate_multinest_sample_files(path):
+        theta, weights = _theta_samples_from_multinest_file(sample_file, ndim)
+        if theta is None or theta.shape[1] < ndim or theta.shape[0] < 2:
+            continue
+
+        physical: Dict[str, np.ndarray] = {
+            "t0": theta[:, 0],
+            "tE": np.exp(theta[:, 1]),
+            "u0": theta[:, 2],
+            "s": np.exp(theta[:, 3]),
+            "q": np.exp(theta[:, 4]),
+            "rho": np.exp(theta[:, 5]),
+        }
+        unc: Dict[str, float] = {}
+        for key, vals in physical.items():
+            sig = _uncertainty_from_samples(vals, weights)
+            if sig is not None:
+                unc[key] = sig
+
+        alpha_sig = _angle_uncertainty_rad(theta[:, 6], weights)
+        if alpha_sig is not None:
+            unc["alpha"] = alpha_sig
+
+        if model_name == "FSBL+Parallax":
+            sig_n = _uncertainty_from_samples(theta[:, 7], weights)
+            sig_e = _uncertainty_from_samples(theta[:, 8], weights)
+            if sig_n is not None:
+                unc["piEN"] = sig_n
+            if sig_e is not None:
+                unc["piEE"] = sig_e
+
+        if unc:
+            return unc
+    return {}
+
 def parse_multinest_result_dir(path: Path) -> Optional[Dict[str, Any]]:
     """
-    Return an FSBL-like section from a MultiNest output directory.
+    Return an FSBL/FSBL+Parallax-like section from a MultiNest output directory.
 
     Preference order:
       1. best_fit.txt, because it contains Fs/Fb/chi2 written by our code.
       2. mn_stats.dat maximum-likelihood parameters.
 
-    If both exist, parameters from best_fit.txt win, but missing values are filled
-    from mn_stats.dat.
+    If posterior sample files exist, attach MultiNest posterior uncertainties in
+    section["multinest_uncertainties"].
     """
     best = parse_multinest_best_fit_txt(path / "best_fit.txt")
-    stats = parse_mn_stats_maxlike(path / "mn_stats.dat")
+    model_name_guess = infer_multinest_model_name(path, best)
+    ndim = 9 if model_name_guess == "FSBL+Parallax" else 7
+    stats = parse_mn_stats_maxlike(path / "mn_stats.dat", ndim=ndim)
 
-    if not best and not stats:
-        return None
-
+    # If the directory name did not say parallax but mn_stats.dat/best_fit does,
+    # re-infer after merging.
     merged = dict(stats)
     merged.update(best)
+    model_name = infer_multinest_model_name(path, merged)
+    if model_name == "FSBL+Parallax" and ndim != 9:
+        stats = parse_mn_stats_maxlike(path / "mn_stats.dat", ndim=9)
+        merged = dict(stats)
+        merged.update(best)
+
+    if not merged:
+        return None
 
     required = ["t_0", "u_0", "t_E", "s", "q", "rho", "alpha_deg"]
+    if model_name == "FSBL+Parallax":
+        required += ["pi_E_N", "pi_E_E"]
     if any(as_float(merged, k) is None for k in required):
         return None
 
-    # If chi2/Fs/Fb are missing, keep the row; the CSV validator may complain
-    # about missing fluxes, but this lets the user see and fix incomplete outputs.
-    return merged
+    unc = multinest_posterior_uncertainties(path, model_name)
+    unc_method = "nested_sampling"
+    if not unc:
+        unc = multinest_stats_uncertainties(path, model_name, merged)
+        unc_method = "nested_sampling_marginals"
+    if unc:
+        merged["multinest_uncertainties"] = unc
+        merged["multinest_uncertainty_method"] = unc_method
+        merged["multinest_confidence_level"] = 0.68
 
+    merged["multinest_model_name"] = model_name
+    return merged
 
 def iter_multinest_dirs(results_roots: Iterable[Path]) -> Iterable[Path]:
     """Find MultiNest result dirs containing mn_stats.dat under result roots."""
@@ -491,12 +812,26 @@ def add_uncertainty_metadata(
     row: Dict[str, Any],
     uncertainties: Optional[Dict[str, float]],
     confidence_level: float = 0.68,
+    method: str = "fisher_matrix",
+    overwrite: bool = False,
 ) -> None:
     if not uncertainties:
         return
+    if row.get("parameter_uncertainties") and not overwrite:
+        return
     row["parameter_uncertainties"] = json.dumps(uncertainties)
-    row["uncertainty_method"] = "fisher_matrix"
+    row["uncertainty_method"] = method
     row["confidence_level"] = confidence_level
+
+
+def add_multinest_uncertainties(row: Dict[str, Any], section: Dict[str, Any]) -> None:
+    """Attach MultiNest posterior uncertainties stored in a parsed section."""
+    unc = section.get("multinest_uncertainties")
+    if not isinstance(unc, dict) or not unc:
+        return
+    method = str(section.get("multinest_uncertainty_method", "nested_sampling"))
+    confidence_level = float(section.get("multinest_confidence_level", 0.68))
+    add_uncertainty_metadata(row, unc, confidence_level=confidence_level, method=method, overwrite=True)
 
 
 def load_fisher_event_data(
@@ -756,6 +1091,7 @@ def convert_section_to_row(
         )
         add_flux_1source(row, section)
         add_common_optional(row, section, model_name, notes)
+        add_multinest_uncertainties(row, section)
         return row
 
     if model_name == "FSBL+Parallax":
@@ -777,6 +1113,7 @@ def convert_section_to_row(
         )
         add_flux_1source(row, section)
         add_common_optional(row, section, model_name, notes)
+        add_multinest_uncertainties(row, section)
         return row
 
     return None
@@ -820,21 +1157,37 @@ def build_rows(
                 row["_section"] = section
                 rows.append(row)
 
-    # PyMultiNest FSBL outputs, e.g. results/*multinest_FSBL_from_FSPL*/mn_stats.dat.
-    if include_multinest and (include_models is None or "FSBL" in include_models):
+    # PyMultiNest FSBL/FSBL+Parallax outputs, e.g.
+    # results/*multinest_FSBL_from_FSPL*/mn_stats.dat and
+    # results/*multinest_FSBL_Parallax_from_FSBL*/mn_stats.dat.
+    wants_multinest = include_multinest and (
+        include_models is None
+        or "FSBL" in include_models
+        or "FSBL+Parallax" in include_models
+    )
+    if wants_multinest:
         for mn_dir in iter_multinest_dirs(results_roots):
             event_id = infer_event_id_from_multinest_dir(mn_dir)
             section = parse_multinest_result_dir(mn_dir)
             if section is None:
                 print(f"WARNING: Could not parse MultiNest result directory: {mn_dir}")
                 continue
+            model_name = str(section.get("multinest_model_name", infer_multinest_model_name(mn_dir, section)))
+            if include_models and model_name not in include_models:
+                continue
             source_tag = str(mn_dir).replace(os.sep, "_") + "_maximum_likelihood"
-            row = convert_section_to_row(event_id, "FSBL", section, source_tag=source_tag)
+            row = convert_section_to_row(event_id, model_name, section, source_tag=source_tag)
             if row is not None:
-                row["solution_alias"] = safe_alias("FSBL_MultiNest_ML", source_tag)
+                alias_model = "FSBL_Parallax_MultiNest_ML" if model_name == "FSBL+Parallax" else "FSBL_MultiNest_ML"
+                row["solution_alias"] = safe_alias(alias_model, source_tag)
                 old_notes = row.get("notes", "")
-                row["notes"] = old_notes + " Maximum-likelihood FSBL parameters imported from MultiNest output."
-                row["_model_name"] = "FSBL"
+                unc_note = " MultiNest posterior-sample uncertainties attached." if section.get("multinest_uncertainties") else ""
+                row["notes"] = (
+                    old_notes
+                    + f" Maximum-likelihood {model_name} parameters imported from MultiNest output."
+                    + unc_note
+                )
+                row["_model_name"] = model_name
                 row["_source_tag"] = source_tag
                 row["_section"] = section
                 rows.append(row)
