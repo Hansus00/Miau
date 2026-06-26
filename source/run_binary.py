@@ -116,6 +116,9 @@ def main() -> int:
             continue
 
         best_chi2_dof = _extract_best_chi2_dof(params_file)
+        if best_chi2_dof == 999999.0:
+            print(f"Skipping {event} because no valid chi2/dof found in {params_file}.")
+            continue
         best_model = _extract_best_model(params_file)
         print(f"Best simple model for {event} = {best_model or 'unknown'}")
         print(f"Best simple chi2/dof for {event} = {best_chi2_dof}")
