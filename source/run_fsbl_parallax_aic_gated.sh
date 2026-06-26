@@ -43,5 +43,6 @@ for d in results/*_multinest_FSBL_from_FSPL; do
     --ephemeris-file data/Roman_ephemeris_jax.txt \
     --n-live 100 \
     --max-points 500 \
+    --max-iter 200000 \
     2>&1 | tee "logs/${EVENT}_multinest_fsbl_parallax.log"
 done

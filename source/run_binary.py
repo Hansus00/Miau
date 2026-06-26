@@ -159,6 +159,8 @@ def main() -> int:
                 "100",
                 "--max-points",
                 "500",
+                "--max-iter",
+                "200000",
             ]
             multinest_rc = _tee_run(multinest_cmd, multinest_log, twinkle_env)
             if multinest_rc != 0:
