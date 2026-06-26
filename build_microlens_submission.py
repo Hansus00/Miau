@@ -2,6 +2,12 @@
 Build a microlens-submit CSV and optionally create/export a submission project
 from this pipeline's *_params.txt result files.
 
+By default, one row per event is not exported: the script scores every fitted
+model with AIC = 2k + 2*(0.5*chi2 + priors), using the same priors as the
+optimizer in source/magnification_model.py. For each event it keeps every model
+from the best result source whose AIC lies within --aic-delta of the minimum
+(default 2). Use --all-models to export every fit without selection.
+
 Typical use from project root:
 
   python build_microlens_submission.py \
@@ -334,20 +340,142 @@ def alpha_to_rad(section: Dict[str, Any]) -> Optional[float]:
     return None
 
 
-def chi2_to_loglike(section: Dict[str, Any]) -> Optional[float]:
+# Nonlinear parameters fitted by the optimizer (Fs/Fb are profiled analytically).
+MODEL_N_NONLINEAR: Dict[str, int] = {
+    "PSPL": 3,
+    "FSPL": 4,
+    "PSPL+Parallax": 5,
+    "FSPL+Parallax": 6,
+    "BSPL": 6,
+    "BSPL+Parallax": 8,
+    "FSBL": 7,
+    "FSBL+Parallax": 9,
+}
+
+
+def model_n_free_params(model_name: str) -> int:
+    """Count nonlinear fit parameters plus profiled source/background fluxes."""
+    k_nl = MODEL_N_NONLINEAR.get(model_name)
+    if k_nl is None:
+        return 0
+    return k_nl + 2
+
+
+def _negative_flux_prior(flux: float, sigma: float = 2.0) -> float:
+    return 0.5 * (max(-flux, 0.0) ** 2) / (sigma**2)
+
+
+def _prior_parallax(section: Dict[str, Any]) -> float:
+    pi_n = as_float(section, "pi_E_N") or 0.0
+    pi_e = as_float(section, "pi_E_E") or 0.0
+    return 0.5 * (pi_n**2 + pi_e**2) / (0.15**2)
+
+
+def _prior_bspl(section: Dict[str, Any]) -> float:
+    qf = as_float(section, "q_f")
+    if qf is None:
+        return 0.0
+    prior = 0.5 * (qf - 1.0) ** 2 / (10.0**2)
+    return prior + 0.5 * (max(-qf, 0.0) ** 2) / (3.0**2)
+
+
+def _prior_fspl(section: Dict[str, Any]) -> float:
+    rho = as_float(section, "rho")
+    if rho is None or rho <= 0.0:
+        return float("inf")
+    log_rho = math.log(rho)
+    return 0.5 * (max(math.log(1.0e-6) - log_rho, 0.0) / 0.5) ** 2 + 0.5 * (
+        max(log_rho - math.log(1.0), 0.0) / 0.5
+    ) ** 2
+
+
+def _prior_fsbl(section: Dict[str, Any]) -> float:
+    rho = as_float(section, "rho")
+    q = as_float(section, "q")
+    if rho is None or q is None or rho <= 0.0 or q <= 0.0:
+        return float("inf")
+    log_rho = math.log(rho)
+    log_q = math.log(q)
+    return (
+        0.5 * (max(math.log(1e-5) - log_rho, 0.0) / 0.5) ** 2
+        + 0.5 * (max(log_rho - math.log(0.2), 0.0) / 0.5) ** 2
+        + 0.5 * (max(math.log(1e-6) - log_q, 0.0) / 0.5) ** 2
+        + 0.5 * (max(log_q - math.log(1.0), 0.0) / 0.5) ** 2
+    )
+
+
+_MODEL_PRIOR_FUNCS = {
+    "FSPL": _prior_fspl,
+    "PSPL+Parallax": _prior_parallax,
+    "FSPL+Parallax": lambda s: _prior_fspl(s) + _prior_parallax(s),
+    "BSPL": _prior_bspl,
+    "BSPL+Parallax": lambda s: _prior_bspl(s) + _prior_parallax(s),
+    "FSBL": _prior_fsbl,
+    "FSBL+Parallax": lambda s: _prior_fsbl(s) + _prior_parallax(s),
+}
+
+
+def model_prior_term(model_name: str, section: Dict[str, Any]) -> float:
+    """Soft priors used in source/magnification_model.neg_lnprob."""
+    prior = 0.0
+    fs = as_float(section, "Fs")
+    fb = as_float(section, "Fb")
+    if fs is not None:
+        prior += _negative_flux_prior(fs, sigma=2.0)
+    if fb is not None:
+        prior += _negative_flux_prior(fb, sigma=2.0)
+    prior_fn = _MODEL_PRIOR_FUNCS.get(model_name)
+    if prior_fn is not None:
+        prior += prior_fn(section)
+    return prior
+
+
+def model_neg_lnprob(model_name: str, section: Dict[str, Any]) -> Optional[float]:
+    """Negative log posterior proxy: 0.5*chi2 + priors (matches the optimizer objective)."""
     chi2 = as_float(section, "Chi2")
     if chi2 is None:
         chi2 = as_float(section, "chi2")
     if chi2 is None:
         return None
-    return -0.5 * chi2
+    prior = model_prior_term(model_name, section)
+    if not math.isfinite(prior):
+        return None
+    return 0.5 * chi2 + prior
 
 
-def n_points(section: Dict[str, Any]) -> Optional[int]:
+def model_aic(model_name: str, section: Dict[str, Any]) -> Optional[float]:
+    """AIC = 2k + 2*neg_lnprob, with k counting nonlinear params plus profiled fluxes."""
+    neg_lnprob = model_neg_lnprob(model_name, section)
+    if neg_lnprob is None:
+        return None
+    k = model_n_free_params(model_name)
+    if k <= 0:
+        return None
+    return 2.0 * k + 2.0 * neg_lnprob
+
+
+def neg_lnprob_to_loglike(neg_lnprob: float) -> float:
+    return -neg_lnprob
+
+
+def n_points(section: Dict[str, Any], model_name: Optional[str] = None) -> Optional[int]:
     for key in ["n_data_points", "eval_n_points", "N", "n_valid"]:
         val = as_float(section, key)
         if val is not None:
             return int(round(val))
+    chi2 = as_float(section, "Chi2")
+    if chi2 is None:
+        chi2 = as_float(section, "chi2")
+    chi2_dof = as_float(section, "chi2/dof")
+    if (
+        model_name is not None
+        and chi2 is not None
+        and chi2_dof is not None
+        and chi2_dof > 0.0
+        and model_name in MODEL_N_NONLINEAR
+    ):
+        dof = chi2 / chi2_dof
+        return int(round(dof + MODEL_N_NONLINEAR[model_name]))
     return None
 
 
@@ -358,11 +486,20 @@ def safe_alias(model_name: str, source_tag: str) -> str:
     return f"{alias}__{source_tag}"[:120]
 
 
-def add_common_optional(row: Dict[str, Any], section: Dict[str, Any], notes: str = "") -> None:
-    ll = chi2_to_loglike(section)
-    if ll is not None:
-        row["log_likelihood"] = ll
-    n = n_points(section)
+def add_common_optional(
+    row: Dict[str, Any],
+    section: Dict[str, Any],
+    model_name: str,
+    notes: str = "",
+) -> None:
+    neg_lnprob = model_neg_lnprob(model_name, section)
+    if neg_lnprob is not None:
+        row["log_likelihood"] = neg_lnprob_to_loglike(neg_lnprob)
+        row["_neg_lnprob"] = neg_lnprob
+    aic = model_aic(model_name, section)
+    if aic is not None:
+        row["_aic"] = aic
+    n = n_points(section, model_name=model_name)
     if n is not None:
         row["n_data_points"] = n
     if notes:
@@ -428,7 +565,7 @@ def convert_section_to_row(
             tE=section["t_E"],
         )
         add_flux_1source(row, section)
-        add_common_optional(row, section, notes)
+        add_common_optional(row, section, model_name, notes)
         return row
 
     if model_name == "FSPL":
@@ -443,7 +580,7 @@ def convert_section_to_row(
             rho=section["rho"],
         )
         add_flux_1source(row, section)
-        add_common_optional(row, section, notes)
+        add_common_optional(row, section, model_name, notes)
         return row
 
     if model_name == "PSPL+Parallax":
@@ -460,7 +597,7 @@ def convert_section_to_row(
             t_ref=as_float(section, "t_0_par", as_float(section, "t_0")),
         )
         add_flux_1source(row, section)
-        add_common_optional(row, section, notes)
+        add_common_optional(row, section, model_name, notes)
         return row
 
     if model_name == "FSPL+Parallax":
@@ -478,7 +615,7 @@ def convert_section_to_row(
             t_ref=as_float(section, "t_0_par", as_float(section, "t_0")),
         )
         add_flux_1source(row, section)
-        add_common_optional(row, section, notes)
+        add_common_optional(row, section, model_name, notes)
         return row
 
     # ------------------ 2S1L / binary source ------------------
@@ -496,7 +633,7 @@ def convert_section_to_row(
             flux_ratio=section["q_f"],
         )
         add_flux_2source(row, section)
-        add_common_optional(row, section, notes)
+        add_common_optional(row, section, model_name, notes)
         return row
 
     if model_name == "BSPL+Parallax":
@@ -516,7 +653,7 @@ def convert_section_to_row(
             t_ref=as_float(section, "t_0_par", as_float(section, "t_0_1")),
         )
         add_flux_2source(row, section)
-        add_common_optional(row, section, notes)
+        add_common_optional(row, section, model_name, notes)
         return row
 
     # ------------------ 1S2L / binary lens ------------------
@@ -535,7 +672,7 @@ def convert_section_to_row(
             rho=section["rho"],
         )
         add_flux_1source(row, section)
-        add_common_optional(row, section, notes)
+        add_common_optional(row, section, model_name, notes)
         return row
 
     if model_name == "FSBL+Parallax":
@@ -556,7 +693,7 @@ def convert_section_to_row(
             t_ref=as_float(section, "t_0_par", as_float(section, "t_0")),
         )
         add_flux_1source(row, section)
-        add_common_optional(row, section, notes)
+        add_common_optional(row, section, model_name, notes)
         return row
 
     return None
@@ -595,6 +732,8 @@ def build_rows(
                 continue
             row = convert_section_to_row(event_id, model_name, section, source_tag=source_tag)
             if row is not None:
+                row["_model_name"] = model_name
+                row["_source_tag"] = source_tag
                 rows.append(row)
 
     # PyMultiNest FSBL outputs, e.g. results/*multinest_FSBL_from_FSPL*/mn_stats.dat.
@@ -611,6 +750,8 @@ def build_rows(
                 row["solution_alias"] = safe_alias("FSBL_MultiNest_ML", source_tag)
                 old_notes = row.get("notes", "")
                 row["notes"] = old_notes + " Maximum-likelihood FSBL parameters imported from MultiNest output."
+                row["_model_name"] = "FSBL"
+                row["_source_tag"] = source_tag
                 rows.append(row)
 
     return rows
@@ -629,6 +770,82 @@ def choose_best_per_event(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         if ll is not None and (prev_ll is None or float(ll) > float(prev_ll)):
             best[eid] = row
     return list(best.values())
+
+
+def _row_source_key(row: Dict[str, Any]) -> str:
+    return str(row.get("_source_tag", row.get("solution_alias", "")))
+
+
+def select_by_aic(rows: List[Dict[str, Any]], delta_aic: float = 2.0) -> List[Dict[str, Any]]:
+    """
+    For each event, pick the result source with the best (lowest) AIC model, then
+    keep every model from that source whose AIC is within ``delta_aic`` of the best.
+
+    AIC uses the same objective as the optimizer: 2k + 2*(0.5*chi2 + priors).
+    """
+    by_event: Dict[str, List[Dict[str, Any]]] = {}
+    for row in rows:
+        if row.get("_aic") is None:
+            continue
+        by_event.setdefault(row["event_id"], []).append(row)
+
+    selected: List[Dict[str, Any]] = []
+    skipped_events: List[str] = []
+
+    for event_id, event_rows in sorted(by_event.items()):
+        by_source: Dict[str, List[Dict[str, Any]]] = {}
+        for row in event_rows:
+            by_source.setdefault(_row_source_key(row), []).append(row)
+
+        best_source = None
+        best_source_min_aic = float("inf")
+        for source_tag, source_rows in by_source.items():
+            source_min = min(float(r["_aic"]) for r in source_rows)
+            if source_min < best_source_min_aic:
+                best_source_min_aic = source_min
+                best_source = source_tag
+
+        if best_source is None:
+            skipped_events.append(event_id)
+            continue
+
+        source_rows = by_source[best_source]
+        min_aic = min(float(r["_aic"]) for r in source_rows)
+        cutoff = min_aic + float(delta_aic)
+        competitive = [r for r in source_rows if float(r["_aic"]) <= cutoff + 1e-9]
+        competitive.sort(key=lambda r: float(r["_aic"]))
+
+        weight_sum = sum(math.exp(-0.5 * (float(r["_aic"]) - min_aic)) for r in competitive)
+        for rank, row in enumerate(competitive, start=1):
+            delta = float(row["_aic"]) - min_aic
+            rel_prob = math.exp(-0.5 * delta) / weight_sum if weight_sum > 0.0 else 1.0
+            row = dict(row)
+            row["aic"] = float(row["_aic"])
+            row["relative_probability"] = rel_prob
+            row["is_active"] = True
+            old_notes = row.get("notes", "")
+            row["notes"] = (
+                f"{old_notes} Selected by AIC (rank {rank}/{len(competitive)}; "
+                f"AIC={row['aic']:.6g}, ΔAIC={delta:.6g} vs best in source)."
+            ).strip()
+            selected.append(row)
+
+    if skipped_events:
+        print(
+            f"WARNING: skipped {len(skipped_events)} event(s) with no AIC-scorable rows: "
+            + ", ".join(skipped_events[:5])
+            + (" ..." if len(skipped_events) > 5 else "")
+        )
+
+    return selected
+
+
+def strip_internal_row_keys(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    internal = {"_aic", "_neg_lnprob", "_model_name", "_source_tag"}
+    cleaned: List[Dict[str, Any]] = []
+    for row in rows:
+        cleaned.append({k: v for k, v in row.items() if k not in internal})
+    return cleaned
 
 
 def write_csv(rows: List[Dict[str, Any]], out_csv: Path) -> None:
@@ -655,6 +872,7 @@ def write_csv(rows: List[Dict[str, Any]], out_csv: Path) -> None:
         "F0_S1",
         "F0_S2",
         "log_likelihood",
+        "aic",
         "n_data_points",
         "relative_probability",
         "is_active",
@@ -739,6 +957,17 @@ def main() -> None:
         default="PSPL,FSPL,PSPL+Parallax,FSPL+Parallax,BSPL,BSPL+Parallax,FSBL,FSBL+Parallax",
         help="Comma-separated model sections to include.",
     )
+    ap.add_argument(
+        "--all-models",
+        action="store_true",
+        help="Export every fitted model row without AIC-based selection.",
+    )
+    ap.add_argument(
+        "--aic-delta",
+        type=float,
+        default=2.0,
+        help="When using AIC selection, include models within this ΔAIC of the best (default: 2).",
+    )
     ap.add_argument("--best-per-event", action="store_true", help="Only submit one best log-likelihood row per event.")
     ap.add_argument(
         "--no-multinest",
@@ -761,6 +990,20 @@ def main() -> None:
 
     if args.best_per_event:
         rows = choose_best_per_event(rows)
+    elif not args.all_models:
+        n_before = len(rows)
+        rows = select_by_aic(rows, delta_aic=args.aic_delta)
+        n_multi = sum(
+            1
+            for eid in {r["event_id"] for r in rows}
+            if sum(1 for r in rows if r["event_id"] == eid) > 1
+        )
+        print(
+            f"AIC selection (ΔAIC <= {args.aic_delta}): kept {len(rows)} row(s) "
+            f"from {n_before} candidate(s); {n_multi} event(s) have multiple solutions."
+        )
+
+    rows = strip_internal_row_keys(rows)
 
     if not rows:
         raise SystemExit("No valid solution rows found. Check --results and model names.")
