@@ -292,6 +292,7 @@ def main() -> None:
     parser.add_argument("--ephemeris-file", default="data/Roman_ephemeris_jax.txt")
     parser.add_argument("--event-id", default=None)
     parser.add_argument("--n-live", type=int, default=int(os.environ.get("MULTINEST_N_LIVE", "200")))
+    parser.add_argument("--max-iter", type=int, default=200000, help="Maximum number of MultiNest iterations/samples")
     parser.add_argument("--evidence-tolerance", type=float, default=float(os.environ.get("MULTINEST_EVIDENCE_TOL", "0.5")))
     parser.add_argument("--sampling-efficiency", type=float, default=float(os.environ.get("MULTINEST_SAMPLING_EFF", "0.3")))
     parser.add_argument("--max-points", type=int, default=int(os.environ.get("MULTINEST_MAX_POINTS", "0")))
