@@ -106,6 +106,18 @@ def _bspl_magnification(t, params):
     A_2 = (u_2**2 + 2) / (u_2 * jnp.sqrt(u_2**2 + 4))
     return (A_1 + params["q_f"] * A_2) / (1 + params["q_f"])
 
+def _bspl_parallax_magnification(t, params):
+    tau_1 = (t - params["t_0_1"]) / params["t_E"]
+    tau_2 = (t - params["t_0_2"]) / params["t_E"]
+    d_tau, d_beta = _parallax_offsets(t, params)
+    tau_1 = tau_1 + d_tau
+    tau_2 = tau_2 + d_tau
+    u_1 = jnp.sqrt(params["u_0_1"] ** 2 + tau_1**2)
+    u_2 = jnp.sqrt(params["u_0_2"] ** 2 + tau_2**2)
+    A_1 = (u_1**2 + 2) / (u_1 * jnp.sqrt(u_1**2 + 4))
+    A_2 = (u_2**2 + 2) / (u_2 * jnp.sqrt(u_2**2 + 4))
+    return (A_1 + params["q_f"] * A_2) / (1 + params["q_f"])
+
 
 def _fsbl_magnification_core(t, t_0, u_0, t_E, rho, q, s, alpha_deg):
     return binary_mag(t_0, u_0, t_E, rho, q, s, alpha_deg, t)
@@ -167,6 +179,7 @@ _MAGNIFICATION_FUNCS = {
     "fspl": _fspl_magnification,
     "fspl_parallax": _fspl_parallax_magnification,
     "bspl": _bspl_magnification,
+    "bspl_parallax": _bspl_parallax_magnification,
     "fsbl": _fsbl_magnification,
     "fsbl_grid": _fsbl_grid_magnification,
 }
