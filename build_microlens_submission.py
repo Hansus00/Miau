@@ -38,6 +38,8 @@ import re
 import shutil
 import subprocess
 import sys
+
+import numpy as np
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
@@ -669,6 +671,62 @@ def alpha_to_rad(section: Dict[str, Any]) -> Optional[float]:
     return None
 
 
+PARALLAX_U0_BRANCH_MODELS = {
+    "PSPL+Parallax",
+    "FSPL+Parallax",
+    "BSPL+Parallax",
+    "FSBL+Parallax",
+}
+U0_BRANCH_RE = re.compile(r"^(?P<base>.+)_(?P<branch>[+-]u0)$")
+
+
+def split_u0_branch_model_name(section_name: str) -> Tuple[str, Optional[str]]:
+    """
+    Normalize section names such as ``FSPL+Parallax_+u0``.
+
+    The microlens-submit model is still ``FSPL+Parallax``; ``+u0``/``-u0``
+    is a real fitted degeneracy branch that must be preserved in alias/notes,
+    not submitted as a separate model tag.
+    """
+    m = U0_BRANCH_RE.match(section_name.strip())
+    if not m:
+        return section_name, None
+    base = m.group("base")
+    branch = m.group("branch")
+    if base not in PARALLAX_U0_BRANCH_MODELS:
+        return section_name, None
+    return base, branch
+
+
+def u0_branch_alias_label(branch: Optional[str]) -> Optional[str]:
+    if branch == "+u0":
+        return "plus_u0"
+    if branch == "-u0":
+        return "minus_u0"
+    return None
+
+
+def decorate_u0_branch_row(
+    row: Dict[str, Any],
+    *,
+    base_model_name: str,
+    raw_section_name: str,
+    branch: Optional[str],
+    source_tag: str,
+) -> None:
+    """Preserve the explicit fitted +u0/-u0 parallax branch in submission metadata."""
+    label = u0_branch_alias_label(branch)
+    if label is None:
+        return
+
+    row["solution_alias"] = safe_alias(f"{base_model_name}_{label}", source_tag)
+    old_notes = row.get("notes", "")
+    row["notes"] = (
+        f"{old_notes} Explicit parallax u0-degeneracy branch {branch} "
+        f"imported from [{raw_section_name}]."
+    ).strip()
+
+
 # Nonlinear parameters fitted by the optimizer (Fs/Fb are profiled analytically).
 MODEL_N_NONLINEAR: Dict[str, int] = {
     "PSPL": 3,
@@ -872,6 +930,8 @@ def attach_fisher_uncertainties(
     event_cache: Dict[str, Optional[Dict[str, Any]]] = {}
     n_attached = 0
     for row in rows:
+        if row.get("_invalid_model_row"):
+            continue
         model_name = row.get("_model_name")
         section = row.get("_section")
         if not model_name or not section:
@@ -902,6 +962,88 @@ def safe_alias(model_name: str, source_tag: str) -> str:
     alias = alias.replace("/", "_").replace("-", "_")
     source_tag = re.sub(r"[^A-Za-z0-9_]+", "_", source_tag)
     return f"{alias}__{source_tag}"[:120]
+
+
+REQUIRED_SUBMISSION_FIELDS_BY_MODEL: Dict[str, List[str]] = {
+    "PSPL": ["t_0", "u_0", "t_E"],
+    "FSPL": ["t_0", "u_0", "t_E", "rho"],
+    "PSPL+Parallax": ["t_0", "u_0", "t_E", "pi_E_N", "pi_E_E"],
+    "FSPL+Parallax": ["t_0", "u_0", "t_E", "rho", "pi_E_N", "pi_E_E"],
+    "BSPL": ["t_0_1", "u_0_1", "t_E", "t_0_2", "u_0_2", "q_f"],
+    "BSPL+Parallax": [
+        "t_0_1", "u_0_1", "t_E", "t_0_2", "u_0_2", "q_f", "pi_E_N", "pi_E_E"
+    ],
+    "FSBL": ["t_0", "u_0", "t_E", "s", "q", "rho"],
+    "FSBL+Parallax": ["t_0", "u_0", "t_E", "s", "q", "rho", "pi_E_N", "pi_E_E"],
+}
+
+
+def _is_nonfinite_present(section: Dict[str, Any], key: str) -> bool:
+    """True only when the key exists and its value is explicitly NaN/inf."""
+    if key not in section:
+        return False
+    try:
+        value = float(section[key])
+    except Exception:
+        return False
+    return not math.isfinite(value)
+
+
+def _nonfinite_submission_fields(model_name: str, section: Dict[str, Any]) -> List[str]:
+    """
+    Return required fitted fields that are explicitly non-finite.
+
+    Missing fields are handled by the normal converter and usually cause the row
+    to be skipped. Explicit NaN/inf means the fitter tried the model but failed;
+    those rows are submitted as model_type='other' rather than being silently
+    interpreted as a physical microlensing model.
+    """
+    fields = list(REQUIRED_SUBMISSION_FIELDS_BY_MODEL.get(model_name, []))
+
+    if model_name in {"FSBL", "FSBL+Parallax"}:
+        # alpha can be written either as alpha_deg or alpha.
+        if "alpha_deg" in section:
+            fields.append("alpha_deg")
+        elif "alpha" in section:
+            fields.append("alpha")
+
+    return [key for key in fields if _is_nonfinite_present(section, key)]
+
+
+def make_other_row_for_nonfinite_model(
+    event_id: str,
+    model_name: str,
+    section: Dict[str, Any],
+    source_tag: str,
+    *,
+    bad_fields: List[str],
+    include_inactive: bool = False,
+) -> Dict[str, Any]:
+    """
+    Convert a failed/non-finite fitted model into a valid microlens-submit
+    'other' solution.
+
+    We do not forward NaN parameters to microlens-submit.  The original model
+    name and the bad fields are preserved in notes and internal metadata.
+    """
+    pretty_bad = ", ".join(f"{key}={section.get(key)!r}" for key in bad_fields)
+    row: Dict[str, Any] = {
+        "event_id": event_id,
+        "solution_alias": safe_alias(f"other_nonfinite_{model_name}", source_tag),
+        "is_active": True if not include_inactive else True,
+        "bands": json.dumps(["0"]),
+        "model_tags": json.dumps(["other"]),
+        "notes": (
+            f"Imported automatically from {source_tag}; original pipeline model "
+            f"{model_name} had non-finite fitted parameter(s): {pretty_bad}. "
+            "Submitted as model_type 'other' so the row remains valid and no NaN "
+            "parameters are passed to microlens-submit."
+        ),
+        "_invalid_model_row": True,
+        "_original_model_name": model_name,
+        "_bad_fields": ",".join(bad_fields),
+    }
+    return row
 
 
 def add_common_optional(
@@ -970,6 +1112,17 @@ def convert_section_to_row(
     }
 
     notes = f"Imported automatically from {source_tag}; original pipeline model: {model_name}."
+
+    bad_fields = _nonfinite_submission_fields(model_name, section)
+    if bad_fields:
+        return make_other_row_for_nonfinite_model(
+            event_id,
+            model_name,
+            section,
+            source_tag,
+            bad_fields=bad_fields,
+            include_inactive=include_inactive,
+        )
 
     # ------------------ 1S1L family ------------------
     if model_name == "PSPL":
@@ -1147,12 +1300,26 @@ def build_rows(
         event_id = infer_event_id_from_params_file(params_file)
         sections = parse_params_txt(params_file)
         source_tag = str(params_file.parent).replace(os.sep, "_")
-        for model_name, section in sections.items():
-            if include_models and model_name not in include_models:
+        for raw_model_name, section in sections.items():
+            model_name, u0_branch = split_u0_branch_model_name(raw_model_name)
+
+            # ``--models FSPL+Parallax`` should include both explicit fitted
+            # branches: [FSPL+Parallax_+u0] and [FSPL+Parallax_-u0].
+            if include_models and model_name not in include_models and raw_model_name not in include_models:
                 continue
+
             row = convert_section_to_row(event_id, model_name, section, source_tag=source_tag)
             if row is not None:
+                decorate_u0_branch_row(
+                    row,
+                    base_model_name=model_name,
+                    raw_section_name=raw_model_name,
+                    branch=u0_branch,
+                    source_tag=source_tag,
+                )
                 row["_model_name"] = model_name
+                row["_raw_model_name"] = raw_model_name
+                row["_u0_branch"] = u0_branch or ""
                 row["_source_tag"] = source_tag
                 row["_section"] = section
                 rows.append(row)
@@ -1219,16 +1386,22 @@ def select_by_aic(rows: List[Dict[str, Any]], delta_aic: float = 2.0) -> List[Di
     For each event, pick the result source with the best (lowest) AIC model, then
     keep every model from that source whose AIC is within ``delta_aic`` of the best.
 
-    AIC uses the same objective as the optimizer: 2k + 2*(0.5*chi2 + priors).
+    Rows that were converted to model_type='other' because of explicit NaN/inf
+    parameters are not allowed to compete with physical models.  If an event has
+    no AIC-scorable physical model at all, keep one such 'other' row so the
+    submission still records that the fitter saw the event but failed safely.
     """
+    all_by_event: Dict[str, List[Dict[str, Any]]] = {}
     by_event: Dict[str, List[Dict[str, Any]]] = {}
     for row in rows:
+        all_by_event.setdefault(row["event_id"], []).append(row)
         if row.get("_aic") is None:
             continue
         by_event.setdefault(row["event_id"], []).append(row)
 
     selected: List[Dict[str, Any]] = []
     skipped_events: List[str] = []
+    selected_events: set[str] = set()
 
     for event_id, event_rows in sorted(by_event.items()):
         by_source: Dict[str, List[Dict[str, Any]]] = {}
@@ -1238,16 +1411,24 @@ def select_by_aic(rows: List[Dict[str, Any]], delta_aic: float = 2.0) -> List[Di
         best_source = None
         best_source_min_aic = float("inf")
         for source_tag, source_rows in by_source.items():
-            source_min = min(float(r["_aic"]) for r in source_rows)
+            finite_source_aics = [
+                float(r["_aic"]) for r in source_rows
+                if math.isfinite(float(r["_aic"]))
+            ]
+            if not finite_source_aics:
+                continue
+            source_min = min(finite_source_aics)
             if source_min < best_source_min_aic:
                 best_source_min_aic = source_min
                 best_source = source_tag
 
         if best_source is None:
-            skipped_events.append(event_id)
             continue
 
-        source_rows = by_source[best_source]
+        source_rows = [
+            r for r in by_source[best_source]
+            if r.get("_aic") is not None and math.isfinite(float(r["_aic"]))
+        ]
         min_aic = min(float(r["_aic"]) for r in source_rows)
         cutoff = min_aic + float(delta_aic)
         competitive = [r for r in source_rows if float(r["_aic"]) <= cutoff + 1e-9]
@@ -1266,6 +1447,26 @@ def select_by_aic(rows: List[Dict[str, Any]], delta_aic: float = 2.0) -> List[Di
                 f"AIC={float(row['_aic']):.6g}, ΔAIC={delta:.6g} vs best in source)."
             ).strip()
             selected.append(row)
+        selected_events.add(event_id)
+
+    # If an event has no finite AIC row but does have an explicit non-finite
+    # model converted to 'other', keep one representative 'other' row.
+    for event_id, event_rows in sorted(all_by_event.items()):
+        if event_id in selected_events:
+            continue
+        invalid_rows = [r for r in event_rows if r.get("_invalid_model_row")]
+        if invalid_rows:
+            row = dict(invalid_rows[0])
+            row["relative_probability"] = 1.0
+            row["is_active"] = True
+            old_notes = row.get("notes", "")
+            row["notes"] = (
+                f"{old_notes} No finite AIC-scorable physical model was available "
+                "for this event, so this failed fit is kept as an 'other' solution."
+            ).strip()
+            selected.append(row)
+        else:
+            skipped_events.append(event_id)
 
     if skipped_events:
         print(
@@ -1276,9 +1477,8 @@ def select_by_aic(rows: List[Dict[str, Any]], delta_aic: float = 2.0) -> List[Di
 
     return selected
 
-
 def strip_internal_row_keys(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    internal = {"_aic", "_neg_lnprob", "_model_name", "_source_tag", "_section"}
+    internal = {"_aic", "_neg_lnprob", "_model_name", "_raw_model_name", "_u0_branch", "_source_tag", "_section", "_invalid_model_row", "_original_model_name", "_bad_fields"}
     cleaned: List[Dict[str, Any]] = []
     for row in rows:
         cleaned.append({k: v for k, v in row.items() if k not in internal})
