@@ -107,7 +107,8 @@ class InitialConditions:
 
 
     def _init_pspl(self, prev_results, data=None):
-        t_E = jnp.minimum((self.end_boundary - self.start_boundary)/2, 100.0)
+        t_E_raw = jnp.abs(self.end_boundary - self.start_boundary) / 2.0
+        t_E = jnp.clip(t_E_raw, 1e-3, 100.0)
         return jnp.array([0.0, jnp.log(t_E), 0.1], dtype=jnp.float64)
 
     def _init_fspl(self, prev_results, data=None):

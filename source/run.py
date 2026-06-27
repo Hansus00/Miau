@@ -56,7 +56,7 @@ def main():
     parser.add_argument("--out-dir", default=None)
     parser.add_argument(
         "--models",
-        default="PSPL,FSPL,PSPL+Parallax,FSPL+Parallax,BSPL",
+        default="PSPL,FSPL,PSPL+Parallax,FSPL+Parallax,BSPL,BSPL+Parallax",
         help="Comma-separated model list. Example: PSPL,FSPL,BSPL,FSBL",
     )
     parser.add_argument("--max-len", type=int, default=46_208)
