@@ -1,0 +1,31 @@
+{
+  "solution_id": "f0845195-f6a9-49a1-a1a0-4869179f183d",
+  "model_type": "other",
+  "bands": [
+    "0"
+  ],
+  "higher_order_effects": [],
+  "t_ref": null,
+  "parameters": {},
+  "is_active": true,
+  "alias": "other_nonfinite_PSPL__results_optax_results",
+  "compute_info": {},
+  "hardware_info": null,
+  "posterior_path": null,
+  "lightcurve_plot_path": null,
+  "lens_plane_plot_path": null,
+  "notes_path": "events/RMDC26_000088/solutions/f0845195-f6a9-49a1-a1a0-4869179f183d.md",
+  "used_astrometry": false,
+  "used_postage_stamps": false,
+  "limb_darkening_model": null,
+  "limb_darkening_coeffs": null,
+  "parameter_uncertainties": null,
+  "uncertainty_method": null,
+  "confidence_level": 0.68,
+  "physical_parameters": null,
+  "physical_parameter_uncertainties": null,
+  "log_likelihood": null,
+  "relative_probability": 1.0,
+  "n_data_points": null,
+  "creation_timestamp": "2026-06-27T02:49:45.557355"
+}

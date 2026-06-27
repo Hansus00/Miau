@@ -1,0 +1,1 @@
+Imported automatically from results_optax_results; original pipeline model: PSPL+Parallax. Explicit parallax u0-degeneracy branch -u0 imported from [PSPL+Parallax_-u0]. Selected by AIC (rank 3/3; AIC=2356.88, ΔAIC=1.92491 vs best in source).

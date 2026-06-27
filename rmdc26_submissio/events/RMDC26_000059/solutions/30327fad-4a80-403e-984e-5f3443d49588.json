@@ -1,0 +1,51 @@
+{
+  "solution_id": "30327fad-4a80-403e-984e-5f3443d49588",
+  "model_type": "2S1L",
+  "bands": [
+    "0"
+  ],
+  "higher_order_effects": [],
+  "t_ref": null,
+  "parameters": {
+    "t0": 2462927.6275842316,
+    "u0": 0.29850695461676263,
+    "tE": 9.32156712112999,
+    "t0_source2": 2462925.0588233983,
+    "u0_source2": 0.7661308788032543,
+    "flux_ratio": 0.3883633924361433,
+    "F0_S1": 0.11169559960601677,
+    "F0_S2": 0.043378481983181824,
+    "F0_B": 2.3457211080360665
+  },
+  "is_active": true,
+  "alias": "BSPL__results_optax_results",
+  "compute_info": {},
+  "hardware_info": null,
+  "posterior_path": null,
+  "lightcurve_plot_path": null,
+  "lens_plane_plot_path": null,
+  "notes_path": "events/RMDC26_000059/solutions/30327fad-4a80-403e-984e-5f3443d49588.md",
+  "used_astrometry": false,
+  "used_postage_stamps": false,
+  "limb_darkening_model": null,
+  "limb_darkening_coeffs": null,
+  "parameter_uncertainties": {
+    "t0": 1463.453213485465,
+    "t0_source2": 94194.388306471,
+    "tE": 58860.62003318574,
+    "u0": 1605.2226520102163,
+    "u0_source2": 9028.625771920188,
+    "flux_ratio": 987.1901616710909,
+    "F0_B": 298.8487242063433,
+    "F0_S1": 365.94388870195854,
+    "F0_S2": 377.46430613784077
+  },
+  "uncertainty_method": "fisher_matrix",
+  "confidence_level": 0.68,
+  "physical_parameters": null,
+  "physical_parameter_uncertainties": null,
+  "log_likelihood": -1286.5376581669684,
+  "relative_probability": 1.0,
+  "n_data_points": 2523,
+  "creation_timestamp": "2026-06-27T02:49:44.172247"
+}

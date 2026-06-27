@@ -1,0 +1,1 @@
+Imported automatically from results_optax_results; original pipeline model: PSPL. Selected by AIC (rank 1/3; AIC=3386.86, ΔAIC=0 vs best in source).

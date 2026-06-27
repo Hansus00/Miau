@@ -1,0 +1,1 @@
+Imported automatically from results_optax_results; original pipeline model: FSPL+Parallax. Explicit parallax u0-degeneracy branch +u0 imported from [FSPL+Parallax_+u0]. Selected by AIC (rank 2/2; AIC=9987.56, ΔAIC=1.87426 vs best in source).

@@ -1,0 +1,2538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Microlensing Data Challenge Submission Dossier - microlensing-innovation-aleje-ujazdowskie</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'rtd-primary': '#dfc5fa',
+              'rtd-secondary': '#361d49',
+              'rtd-accent': '#a859e4',
+              'rtd-background': '#faf7fd',
+              'rtd-text': '#000',
+            },
+            fontFamily: {
+              inter: ['Inter', 'sans-serif'],
+            },
+          },
+        },
+      };
+    </script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap"
+        rel="stylesheet"
+    >
+    <!-- Highlight.js for code syntax highlighting -->
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css"
+    >
+    <script
+        src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"
+    >
+    </script>
+    <script>hljs.highlightAll();</script>
+    <style>
+        .prose {
+            color: #000;
+            line-height: 1.6;
+        }
+        .prose h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #361d49;
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+        }
+        .prose h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #361d49;
+            margin-top: 1.25rem;
+            margin-bottom: 0.5rem;
+        }
+        .prose h3 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #a859e4;
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+        }
+        .prose p {
+            margin-bottom: 0.75rem;
+        }
+        .prose ul, .prose ol {
+            margin-left: 1.5rem;
+            margin-bottom: 0.75rem;
+        }
+        .prose ul { list-style-type: disc; }
+        .prose ol { list-style-type: decimal; }
+        .prose li {
+            margin-bottom: 0.25rem;
+        }
+        .prose code {
+            background: #f3f3f3;
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+        }
+        .prose pre {
+            background: #f8f8f8;
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 1rem 0;
+            border: 1px solid #e5e5e5;
+        }
+        .prose pre code {
+            background: none;
+            padding: 0;
+        }
+        .prose blockquote {
+            border-left: 4px solid #a859e4;
+            padding-left: 1rem;
+            margin: 1rem 0;
+            font-style: italic;
+            color: #666;
+        }
+    </style>
+</head>
+<body class="font-inter bg-rtd-background">
+    <div class="max-w-7xl mx-auto p-6 lg:p-8">
+        <div class="bg-white shadow-xl rounded-lg">
+            <!-- Header Section -->
+            <div class="text-center py-8">
+                <img src="./assets/rges-pit_logo.png" alt="RGES-PIT Logo" class="w-48 mx-auto mb-6">
+                <h1 class="text-4xl font-bold text-rtd-secondary text-center mb-2">
+                    Microlensing Data Challenge Submission Dossier
+                </h1>
+                <p class="text-xl text-rtd-accent text-center mb-8">
+                    Team: microlensing-innovation-aleje-ujazdowskie |
+                    Tier: beginner
+                </p>
+                
+        <div class="flex items-center justify-center mb-4">
+            <a href="https://github.com/Hansus00/Miau" target="_blank" rel="noopener"
+               class="flex items-center space-x-2 group">
+                <img src="assets/github-desktop_logo.png" alt="GitHub"
+                     class="w-6 h-6 inline-block align-middle mr-2 group-hover:opacity-80"
+                     style="display:inline;vertical-align:middle;">
+                <span class="text-base text-rtd-accent font-semibold group-hover:underline">
+                    Hansus00/Miau
+                </span>
+            </a>
+        </div>
+        
+            </div>
+
+            <hr class="border-t-4 border-rtd-accent my-8 mx-8">
+
+            <!-- Regex Start -->
+
+            <!-- Submission Summary Section -->
+            <section class="mb-10 px-8">
+                <h2 class="text-2xl font-semibold text-rtd-secondary mb-4">
+                    Submission Overview
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-rtd-primary p-6 rounded-lg shadow-md text-center">
+                        <p class="text-sm font-medium text-rtd-secondary">
+                            Total Events Submitted
+                        </p>
+                        <p class="text-4xl font-bold text-rtd-accent mt-2">
+                            188
+                        </p>
+                    </div>
+                    <div class="bg-rtd-primary p-6 rounded-lg shadow-md text-center">
+                        <p class="text-sm font-medium text-rtd-secondary">
+                            Total Active Solutions
+                        </p>
+                        <p class="text-4xl font-bold text-rtd-accent mt-2">
+                            293
+                        </p>
+                    </div>
+                    <div class="bg-rtd-primary p-6 rounded-lg shadow-md text-center">
+                        <p class="text-sm font-medium text-rtd-secondary">
+                            Hardware Information
+                        </p>
+                        <p class="text-lg text-rtd-text mt-2">
+                            No hardware information available
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Overall Progress & Compute Time -->
+            <section class="mb-10 px-8">
+                <h2 class="text-2xl font-semibold text-rtd-secondary mb-4">
+                    Challenge Progress & Compute Summary
+                </h2>
+
+                <!-- Progress Bar -->
+                <div class="w-full bg-gray-200 rounded-full h-4 mb-4">
+                    <div class="bg-rtd-accent h-4 rounded-full" style="width: 64.16382252559727%"></div>
+                </div>
+                <p class="text-sm text-rtd-text text-center mb-6">
+                    188 / 293 Events Processed
+                    (64.2%)
+                </p>
+
+                <!-- Compute Time Summary -->
+                <div class="text-lg text-rtd-text mb-2">
+                    <p><strong>Total CPU Hours:</strong> 0.00</p>
+                    <p><strong>Total Wall Time Hours:</strong> 0.00</p>
+                </div>
+                <p class="text-sm text-gray-500 italic">
+                    Note: Comparison to other teams' compute times is available in the
+                    Evaluator Dossier.
+                </p>
+            </section>
+
+            <!-- Event List -->
+            <section class="mb-10 px-8">
+                <h2 class="text-2xl font-semibold text-rtd-secondary mb-4">
+                    Submitted Events
+                </h2>
+                <table class="w-full text-left table-auto border-collapse">
+                    <thead class="bg-rtd-primary text-rtd-secondary uppercase text-sm">
+                        <tr>
+                            <th class="py-3 px-4">Event ID</th>
+                            <th class="py-3 px-4">Active Solutions</th>
+                            <th class="py-3 px-4">Model Types Submitted</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-rtd-text">
+                        
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000001.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000001
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000002.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000002
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000003.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000003
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000004.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000004
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000005.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000005
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000006.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000006
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000007.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000007
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000008.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000008
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000009.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000009
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000010.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000010
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000011.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000011
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000012.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000012
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000013.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000013
+                    </a>
+                </td>
+                <td class="py-3 px-4">4</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000014.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000014
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000015.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000015
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000016.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000016
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000017.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000017
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000018.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000018
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000019.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000019
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000020.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000020
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000021.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000021
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000022.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000022
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000023.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000023
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000024.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000024
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000025.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000025
+                    </a>
+                </td>
+                <td class="py-3 px-4">5</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000026.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000026
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000027.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000027
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000028.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000028
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000029.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000029
+                    </a>
+                </td>
+                <td class="py-3 px-4">3</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000030.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000030
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000031.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000031
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000032.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000032
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000033.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000033
+                    </a>
+                </td>
+                <td class="py-3 px-4">3</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000034.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000034
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000035.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000035
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000036.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000036
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000037.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000037
+                    </a>
+                </td>
+                <td class="py-3 px-4">3</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000038.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000038
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000039.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000039
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000040.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000040
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000041.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000041
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000042.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000042
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000043.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000043
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000044.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000044
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000045.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000045
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000046.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000046
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000047.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000047
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000048.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000048
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000049.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000049
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000050.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000050
+                    </a>
+                </td>
+                <td class="py-3 px-4">4</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000051.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000051
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000052.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000052
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000053.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000053
+                    </a>
+                </td>
+                <td class="py-3 px-4">5</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000054.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000054
+                    </a>
+                </td>
+                <td class="py-3 px-4">3</td>
+                <td class="py-3 px-4">1S1L, 2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000055.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000055
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000056.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000056
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000057.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000057
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000058.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000058
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000059.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000059
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000060.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000060
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000061.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000061
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000062.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000062
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000063.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000063
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000064.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000064
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000065.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000065
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000066.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000066
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000067.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000067
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000068.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000068
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000069.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000069
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000070.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000070
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L, 2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000071.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000071
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000072.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000072
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000073.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000073
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000074.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000074
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L, 2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000075.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000075
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000076.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000076
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">other</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000077.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000077
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000078.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000078
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000079.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000079
+                    </a>
+                </td>
+                <td class="py-3 px-4">3</td>
+                <td class="py-3 px-4">1S1L, 2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000080.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000080
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000081.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000081
+                    </a>
+                </td>
+                <td class="py-3 px-4">4</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000082.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000082
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000083.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000083
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000084.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000084
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000085.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000085
+                    </a>
+                </td>
+                <td class="py-3 px-4">3</td>
+                <td class="py-3 px-4">1S1L, 2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000086.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000086
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000087.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000087
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000088.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000088
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">other</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000089.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000089
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000090.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000090
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L, 2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000091.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000091
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000092.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000092
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000093.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000093
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000094.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000094
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000095.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000095
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000096.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000096
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000097.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000097
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">other</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000098.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000098
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000099.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000099
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000100.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000100
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">other</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000101.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000101
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000102.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000102
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000103.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000103
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000104.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000104
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">other</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000105.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000105
+                    </a>
+                </td>
+                <td class="py-3 px-4">3</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000106.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000106
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000107.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000107
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000108.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000108
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000109.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000109
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000110.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000110
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000111.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000111
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000112.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000112
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000113.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000113
+                    </a>
+                </td>
+                <td class="py-3 px-4">4</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000114.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000114
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L, 2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000115.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000115
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000116.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000116
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000117.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000117
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000118.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000118
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000119.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000119
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000120.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000120
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000121.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000121
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000122.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000122
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000123.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000123
+                    </a>
+                </td>
+                <td class="py-3 px-4">3</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000124.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000124
+                    </a>
+                </td>
+                <td class="py-3 px-4">3</td>
+                <td class="py-3 px-4">1S1L, 2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000125.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000125
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000126.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000126
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000127.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000127
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000128.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000128
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000129.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000129
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000130.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000130
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000131.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000131
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000132.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000132
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000133.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000133
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000134.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000134
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000135.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000135
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000136.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000136
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000137.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000137
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000138.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000138
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000139.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000139
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000140.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000140
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000141.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000141
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000142.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000142
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000143.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000143
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000144.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000144
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000145.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000145
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000146.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000146
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000147.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000147
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000148.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000148
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000149.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000149
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000150.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000150
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000151.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000151
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000152.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000152
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L, 2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000153.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000153
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000154.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000154
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000155.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000155
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000156.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000156
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000157.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000157
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000158.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000158
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000159.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000159
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000160.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000160
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000161.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000161
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000162.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000162
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000163.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000163
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000164.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000164
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000165.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000165
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000166.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000166
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000167.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000167
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000168.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000168
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000169.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000169
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000170.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000170
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000171.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000171
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000172.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000172
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000173.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000173
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000174.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000174
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000175.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000175
+                    </a>
+                </td>
+                <td class="py-3 px-4">3</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000176.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000176
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000177.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000177
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000178.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000178
+                    </a>
+                </td>
+                <td class="py-3 px-4">3</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000179.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000179
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000180.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000180
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000181.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000181
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000182.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000182
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000183.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000183
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000184.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000184
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000185.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000185
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000186.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000186
+                    </a>
+                </td>
+                <td class="py-3 px-4">2</td>
+                <td class="py-3 px-4">2S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000187.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000187
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                <td class="py-3 px-4">
+                    <a href="RMDC26_000188.html"
+                       class="font-medium text-rtd-accent hover:underline">
+                        RMDC26_000188
+                    </a>
+                </td>
+                <td class="py-3 px-4">1</td>
+                <td class="py-3 px-4">1S1L</td>
+            </tr>
+        
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- Aggregate Parameter Distributions (Placeholders) -->
+            <section class="mb-10 px-8">
+                <h2 class="text-2xl font-semibold text-rtd-secondary mb-4">
+                    Aggregate Parameter Distributions
+                </h2>
+                <p class="text-sm text-gray-500 italic mb-4">
+                    Note: These plots show distributions from <em>your</em> submitted
+                    solutions. Comparisons to simulation truths and other teams' results
+                    are available in the Evaluator Dossier.
+                </p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="text-center">
+                        <img src="https://placehold.co/600x300/dfc5fa/361d49?text=tE+Distribution"
+                             alt="tE Distribution"
+                             class="w-full rounded-lg shadow-md"
+                        >
+                        <p class="text-sm text-gray-600 mt-2">
+                            Histogram of Einstein Crossing Times (tE) from your
+                            active solutions.
+                        </p>
+                    </div>
+                    <div class="text-center">
+                        <img src="https://placehold.co/600x300/dfc5fa/361d49?text=u0+Distribution"
+                             alt="u0 Distribution"
+                             class="w-full rounded-lg shadow-md"
+                        >
+                        <p class="text-sm text-gray-600 mt-2">
+                            Histogram of Impact Parameters (u0) from your active
+                            solutions.
+                        </p>
+                    </div>
+                    <div class="text-center">
+                        <img src="https://placehold.co/600x300/dfc5fa/361d49?text=Lens+Mass+Distribution"
+                             alt="M_L Distribution"
+                             class="w-full rounded-lg shadow-md"
+                        >
+                        <p class="text-sm text-gray-600 mt-2">
+                            Histogram of derived Lens Masses (M_L) from your
+                            active solutions.
+                        </p>
+                    </div>
+                    <div class="text-center">
+                        <img src="https://placehold.co/600x300/dfc5fa/361d49?text=Lens+Distance+Distribution"
+                             alt="D_L Distribution"
+                             class="w-full rounded-lg shadow-md"
+                        >
+                        <p class="text-sm text-gray-600 mt-2">
+                            Histogram of derived Lens Distances (D_L) from your
+                            active solutions.
+                        </p>
+                    </div>
+                </div>
+            </section>
+            <div class="text-center"><a href="./full_dossier_report.html" class="inline-block bg-rtd-accent text-white py-3 px-6 rounded-lg shadow-md hover:bg-rtd-secondary transition-colors duration-200 text-lg font-semibold mt-8">View Full Comprehensive Dossier (Printable)</a></div>
+
+            <!-- Footer -->
+            <div class="text-sm text-gray-500 text-center pt-8 pb-6">
+                Generated by microlens-submit v0.17.9 on
+                2026-06-27 04:49:54 UTC
+            </div>
+
+            <!-- Regex Finish -->
+
+        </div>
+    </div>
+</body>
+</html>
