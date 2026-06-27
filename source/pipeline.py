@@ -106,9 +106,7 @@ def run_pipeline(files, out_dir, data_loader, models, max_len):
             # 2-fold ecliptic degeneracy for single source (u_0 at idx 2)
             batched_opt_params_dict["+u0"] = vmap_opt_loops[m.name](batched_init_params, batched_data)["params"]
             batched_opt_params_dict["-u0"] = vmap_opt_loops[m.name](batched_init_params.at[:, 2].multiply(-1.0), batched_data)["params"]
-            
         else:
-            # Standard single optimization
             batched_opt_params_dict[""] = vmap_opt_loops[m.name](batched_init_params, batched_data)["params"]
 
         batched_dict_lists = defaultdict(list)
@@ -146,14 +144,13 @@ def run_pipeline(files, out_dir, data_loader, models, max_len):
                     "Fb": Fb,
                 }
 
-                if chi2 < best_chi2:
+                if best_dict is None or chi2 < best_chi2:
                     best_chi2 = chi2
                     best_params = single_params
                     best_dict = p_dict
                     best_Fs = Fs
                     best_Fb = Fb
 
-            # Append only the best result to prev_results lists
             for k, v in best_dict.items():
                 batched_dict_lists[k].append(v)
             Fs_list.append(best_Fs)
@@ -176,7 +173,6 @@ def run_pipeline(files, out_dir, data_loader, models, max_len):
         )
         with open(out_file, "w") as f:
             for m in models:
-                # Write out all variants evaluated for this model
                 for key in model_output_keys[m.name]:
                     res = event_model_results[i][key]
                     f.write(f"[{key}]\n")
