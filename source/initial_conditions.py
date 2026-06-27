@@ -93,6 +93,7 @@ class InitialConditions:
             "FSPL": self._init_fspl,
             "PSPL+Parallax": self._init_pspl_parallax,
             "FSPL+Parallax": self._init_fspl_parallax,
+            "BSPL+Parallax": self._init_bspl_parallax,
             "BSPL": self._init_bspl,
             "FSBL": self._init_fsbl,
         }
@@ -156,3 +157,7 @@ class InitialConditions:
                 ),
             ]
         )
+
+    def _init_bspl_parallax(self, prev_results, data=None):
+        bspl = prev_results["BSPL"]["raw_params"]
+        return jnp.concatenate([bspl, jnp.array([0.0, 0.0], dtype=jnp.float64)])
