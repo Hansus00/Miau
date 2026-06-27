@@ -11,7 +11,7 @@ from magnification_model import ensure_ephemeris_loaded, magnification
 from optimization import build_optimize_loop, get_eval_metrics
 
 
-_PARALLAX_MODEL_NAMES = frozenset({"PSPL+Parallax", "FSPL+Parallax"})
+_PARALLAX_MODEL_NAMES = frozenset({"PSPL+Parallax", "Parallax", "FSPL+Parallax", "BSPL+Parallax"})
 
 
 def run_pipeline(files, out_dir, data_loader, models, max_len):
@@ -92,36 +92,100 @@ def run_pipeline(files, out_dir, data_loader, models, max_len):
             batched_init_params.append(p)
         batched_init_params = jnp.stack(batched_init_params)
 
-        res = vmap_opt_loops[m.name](batched_init_params, batched_data)
-        batched_opt_params = res["params"]
+        if m.name in _PARALLAX_MODEL_NAMES:
+            # 1. Run optimization with standard (+u_0) initialization
+            res_plus = vmap_opt_loops[m.name](batched_init_params, batched_data)
+            batched_opt_params_plus = res_plus["params"]
+
+            # 2. Flip u_0 for the alternate (-u_0) initialization
+            if m.name in ("PSPL+Parallax", "Parallax", "FSPL+Parallax"):
+                batched_init_params_minus = batched_init_params.at[:, 2].multiply(-1.0)
+            elif m.name == "BSPL+Parallax":
+                batched_init_params_minus = batched_init_params.at[:, 3:5].multiply(-1.0)
+            else:
+                batched_init_params_minus = batched_init_params
+
+            # Run optimization with flipped (-u_0) initialization
+            res_minus = vmap_opt_loops[m.name](batched_init_params_minus, batched_data)
+            batched_opt_params_minus = res_minus["params"]
+        else:
+            res = vmap_opt_loops[m.name](batched_init_params, batched_data)
+            batched_opt_params = res["params"]
 
         batched_dict_lists = defaultdict(list)
         Fs_list, Fb_list = [], []
+        best_raw_params_list = []
+
         for i in range(num_events):
             single_data = {k: v[i] for k, v in batched_data.items()}
-            single_params = batched_opt_params[i]
-            p_dict = m.to_dict(single_params, single_data)
-
-            A = magnification(single_data["t"], p_dict)
-            Fs, Fb, chi2 = get_eval_metrics(
-                A, single_data["mag"], single_data["mag_err"]
-            )
             dof = int(single_data["n_valid"]) - len(m.param_names)
 
-            event_model_results[i][m.name] = {
-                "param_dict": p_dict,
-                "chi2": chi2,
-                "dof": dof,
-                "Fs": Fs,
-                "Fb": Fb,
-            }
+            if m.name in _PARALLAX_MODEL_NAMES:
+
+                p_plus = batched_opt_params_plus[i]
+                dict_plus = m.to_dict(p_plus, single_data)
+                A_plus = magnification(single_data["t"], dict_plus)
+                Fs_plus, Fb_plus, chi2_plus = get_eval_metrics(
+                    A_plus, single_data["mag"], single_data["mag_err"]
+                )
+
+
+                p_minus = batched_opt_params_minus[i]
+                dict_minus = m.to_dict(p_minus, single_data)
+                A_minus = magnification(single_data["t"], dict_minus)
+                Fs_minus, Fb_minus, chi2_minus = get_eval_metrics(
+                    A_minus, single_data["mag"], single_data["mag_err"]
+                )
+
+                event_model_results[i][f"{m.name}_+u0"] = {
+                    "param_dict": dict_plus,
+                    "chi2": chi2_plus,
+                    "dof": dof,
+                    "Fs": Fs_plus,
+                    "Fb": Fb_plus,
+                }
+                event_model_results[i][f"{m.name}_-u0"] = {
+                    "param_dict": dict_minus,
+                    "chi2": chi2_minus,
+                    "dof": dof,
+                    "Fs": Fs_minus,
+                    "Fb": Fb_minus,
+                }
+
+                if chi2_minus < chi2_plus:
+                    single_params = p_minus
+                    p_dict = dict_minus
+                    Fs = Fs_minus
+                    Fb = Fb_minus
+                else:
+                    single_params = p_plus
+                    p_dict = dict_plus
+                    Fs = Fs_plus
+                    Fb = Fb_plus
+            else:
+                single_params = batched_opt_params[i]
+                p_dict = m.to_dict(single_params, single_data)
+                A = magnification(single_data["t"], p_dict)
+                Fs, Fb, chi2 = get_eval_metrics(
+                    A, single_data["mag"], single_data["mag_err"]
+                )
+
+                event_model_results[i][m.name] = {
+                    "param_dict": p_dict,
+                    "chi2": chi2,
+                    "dof": dof,
+                    "Fs": Fs,
+                    "Fb": Fb,
+                }
+
             for k, v in p_dict.items():
                 batched_dict_lists[k].append(v)
             Fs_list.append(Fs)
             Fb_list.append(Fb)
+            best_raw_params_list.append(single_params)
 
         prev_results[m.name] = {
-            "raw_params": batched_opt_params,
+            "raw_params": jnp.stack(best_raw_params_list),
             "dict": {
                 k: (jnp.stack(v) if isinstance(v[0], (jnp.ndarray, float, int)) else v)
                 for k, v in batched_dict_lists.items()
@@ -136,11 +200,17 @@ def run_pipeline(files, out_dir, data_loader, models, max_len):
         )
         with open(out_file, "w") as f:
             for m in models:
-                res = event_model_results[i][m.name]
-                f.write(f"[{m.name}]\n")
-                for key in m.param_names:
-                    f.write(f"{key}: {res['param_dict'][key]}\n")
-                f.write(f"Chi2: {res['chi2']}\n")
-                f.write(f"chi2/dof: {res['chi2'] / res['dof']}\n")
-                f.write(f"Fs: {res['Fs']}\n")
-                f.write(f"Fb: {res['Fb']}\n\n")
+                if m.name in _PARALLAX_MODEL_NAMES:
+                    keys_to_write = [f"{m.name}_+u0", f"{m.name}_-u0"]
+                else:
+                    keys_to_write = [m.name]
+
+                for key in keys_to_write:
+                    res = event_model_results[i][key]
+                    f.write(f"[{key}]\n")
+                    for p_name in m.param_names:
+                        f.write(f"{p_name}: {res['param_dict'][p_name]}\n")
+                    f.write(f"Chi2: {res['chi2']}\n")
+                    f.write(f"chi2/dof: {res['chi2'] / res['dof']}\n")
+                    f.write(f"Fs: {res['Fs']}\n")
+                    f.write(f"Fb: {res['Fb']}\n\n")
