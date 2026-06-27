@@ -145,7 +145,7 @@ class InitialConditions:
         )
 
     def _init_fsbl(self, prev_results, data=None):
-        
+
         pspl = prev_results["PSPL"]["raw_params"]
         return jnp.concatenate(
             [

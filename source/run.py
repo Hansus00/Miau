@@ -7,7 +7,7 @@ import jax
 jax.config.update("jax_enable_x64", True)
 
 from data_loader import DataLoader
-from models import BSPL, FSBL, FSPL, FSPLParallax, PSPL, Parallax
+from models import BSPL, FSBL, FSPL, FSPLParallax, PSPL, Parallax, BSPLParallax
 from pipeline import run_pipeline
 
 
@@ -18,6 +18,7 @@ MODEL_REGISTRY = {
     "Parallax": Parallax,
     "FSPL+Parallax": FSPLParallax,
     "BSPL": BSPL,
+    "BSPL+Parallax": BSPLParallax,
     "FSBL": FSBL,
 }
 
