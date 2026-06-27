@@ -74,6 +74,7 @@ def run_pipeline(files, out_dir, data_loader, models, max_len):
 
     prev_results = {}
     event_model_results = {i: {} for i in range(num_events)}
+    model_output_keys = defaultdict(list)
 
     for m in models:
 
@@ -92,25 +93,23 @@ def run_pipeline(files, out_dir, data_loader, models, max_len):
             batched_init_params.append(p)
         batched_init_params = jnp.stack(batched_init_params)
 
-        if m.name in _PARALLAX_MODEL_NAMES:
-            # 1. Run optimization with standard (+u_0) initialization
-            res_plus = vmap_opt_loops[m.name](batched_init_params, batched_data)
-            batched_opt_params_plus = res_plus["params"]
+        batched_opt_params_dict = {}
 
-            # 2. Flip u_0 for the alternate (-u_0) initialization
-            if m.name in ("PSPL+Parallax", "Parallax", "FSPL+Parallax"):
-                batched_init_params_minus = batched_init_params.at[:, 2].multiply(-1.0)
-            elif m.name == "BSPL+Parallax":
-                batched_init_params_minus = batched_init_params.at[:, 3:5].multiply(-1.0)
-            else:
-                batched_init_params_minus = batched_init_params
+        if m.name == "BSPL+Parallax":
+            # 4-fold degeneracy for binary source with parallax (u_0_1 at idx 3, u_0_2 at idx 4)
+            batched_opt_params_dict["+u01_+u02"] = vmap_opt_loops[m.name](batched_init_params, batched_data)["params"]
+            batched_opt_params_dict["+u01_-u02"] = vmap_opt_loops[m.name](batched_init_params.at[:, 4].multiply(-1.0), batched_data)["params"]
+            batched_opt_params_dict["-u01_+u02"] = vmap_opt_loops[m.name](batched_init_params.at[:, 3].multiply(-1.0), batched_data)["params"]
+            batched_opt_params_dict["-u01_-u02"] = vmap_opt_loops[m.name](batched_init_params.at[:, 3:5].multiply(-1.0), batched_data)["params"]
 
-            # Run optimization with flipped (-u_0) initialization
-            res_minus = vmap_opt_loops[m.name](batched_init_params_minus, batched_data)
-            batched_opt_params_minus = res_minus["params"]
+        elif m.name in _PARALLAX_MODEL_NAMES:
+            # 2-fold ecliptic degeneracy for single source (u_0 at idx 2)
+            batched_opt_params_dict["+u0"] = vmap_opt_loops[m.name](batched_init_params, batched_data)["params"]
+            batched_opt_params_dict["-u0"] = vmap_opt_loops[m.name](batched_init_params.at[:, 2].multiply(-1.0), batched_data)["params"]
+            
         else:
-            res = vmap_opt_loops[m.name](batched_init_params, batched_data)
-            batched_opt_params = res["params"]
+            # Standard single optimization
+            batched_opt_params_dict[""] = vmap_opt_loops[m.name](batched_init_params, batched_data)["params"]
 
         batched_dict_lists = defaultdict(list)
         Fs_list, Fb_list = [], []
@@ -120,57 +119,26 @@ def run_pipeline(files, out_dir, data_loader, models, max_len):
             single_data = {k: v[i] for k, v in batched_data.items()}
             dof = int(single_data["n_valid"]) - len(m.param_names)
 
-            if m.name in _PARALLAX_MODEL_NAMES:
+            best_chi2 = float('inf')
+            best_params = None
+            best_dict = None
+            best_Fs = None
+            best_Fb = None
 
-                p_plus = batched_opt_params_plus[i]
-                dict_plus = m.to_dict(p_plus, single_data)
-                A_plus = magnification(single_data["t"], dict_plus)
-                Fs_plus, Fb_plus, chi2_plus = get_eval_metrics(
-                    A_plus, single_data["mag"], single_data["mag_err"]
-                )
-
-
-                p_minus = batched_opt_params_minus[i]
-                dict_minus = m.to_dict(p_minus, single_data)
-                A_minus = magnification(single_data["t"], dict_minus)
-                Fs_minus, Fb_minus, chi2_minus = get_eval_metrics(
-                    A_minus, single_data["mag"], single_data["mag_err"]
-                )
-
-                event_model_results[i][f"{m.name}_+u0"] = {
-                    "param_dict": dict_plus,
-                    "chi2": chi2_plus,
-                    "dof": dof,
-                    "Fs": Fs_plus,
-                    "Fb": Fb_plus,
-                }
-                event_model_results[i][f"{m.name}_-u0"] = {
-                    "param_dict": dict_minus,
-                    "chi2": chi2_minus,
-                    "dof": dof,
-                    "Fs": Fs_minus,
-                    "Fb": Fb_minus,
-                }
-
-                if chi2_minus < chi2_plus:
-                    single_params = p_minus
-                    p_dict = dict_minus
-                    Fs = Fs_minus
-                    Fb = Fb_minus
-                else:
-                    single_params = p_plus
-                    p_dict = dict_plus
-                    Fs = Fs_plus
-                    Fb = Fb_plus
-            else:
-                single_params = batched_opt_params[i]
+            for variant, batched_params in batched_opt_params_dict.items():
+                single_params = batched_params[i]
                 p_dict = m.to_dict(single_params, single_data)
+
                 A = magnification(single_data["t"], p_dict)
                 Fs, Fb, chi2 = get_eval_metrics(
                     A, single_data["mag"], single_data["mag_err"]
                 )
 
-                event_model_results[i][m.name] = {
+                res_key = f"{m.name}_{variant}" if variant else m.name
+                if i == 0:
+                    model_output_keys[m.name].append(res_key)
+
+                event_model_results[i][res_key] = {
                     "param_dict": p_dict,
                     "chi2": chi2,
                     "dof": dof,
@@ -178,11 +146,19 @@ def run_pipeline(files, out_dir, data_loader, models, max_len):
                     "Fb": Fb,
                 }
 
-            for k, v in p_dict.items():
+                if chi2 < best_chi2:
+                    best_chi2 = chi2
+                    best_params = single_params
+                    best_dict = p_dict
+                    best_Fs = Fs
+                    best_Fb = Fb
+
+            # Append only the best result to prev_results lists
+            for k, v in best_dict.items():
                 batched_dict_lists[k].append(v)
-            Fs_list.append(Fs)
-            Fb_list.append(Fb)
-            best_raw_params_list.append(single_params)
+            Fs_list.append(best_Fs)
+            Fb_list.append(best_Fb)
+            best_raw_params_list.append(best_params)
 
         prev_results[m.name] = {
             "raw_params": jnp.stack(best_raw_params_list),
@@ -200,12 +176,8 @@ def run_pipeline(files, out_dir, data_loader, models, max_len):
         )
         with open(out_file, "w") as f:
             for m in models:
-                if m.name in _PARALLAX_MODEL_NAMES:
-                    keys_to_write = [f"{m.name}_+u0", f"{m.name}_-u0"]
-                else:
-                    keys_to_write = [m.name]
-
-                for key in keys_to_write:
+                # Write out all variants evaluated for this model
+                for key in model_output_keys[m.name]:
                     res = event_model_results[i][key]
                     f.write(f"[{key}]\n")
                     for p_name in m.param_names:
