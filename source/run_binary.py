@@ -142,8 +142,14 @@ def main() -> int:
                     "MN_U0_MIN": "0",
                     "MN_U0_MAX": "4",
                     "TWINKLE_PYTHON_DIR": os.environ.get("TWINKLE_PYTHON_DIR", str(Path.home() / "Twinkle" / "python")),
+                    # Large FSBL budget: no more 500-point uniform thinning.
+                    # The likelihood is evaluated in Twinkle batches by multinest_twinkle.py.
+                    "MULTINEST_FSBL_MAX_POINTS": os.environ.get("MULTINEST_FSBL_MAX_POINTS", "15000"),
+                    "TWINKLE_BATCH_SIZE": os.environ.get("TWINKLE_BATCH_SIZE", "2048"),
                 }
             )
+            multinest_max_points = twinkle_env["MULTINEST_FSBL_MAX_POINTS"]
+            twinkle_batch_size = twinkle_env["TWINKLE_BATCH_SIZE"]
             multinest_cmd = [
                 sys.executable,
                 "source/multinest_twinkle.py",
@@ -156,12 +162,20 @@ def main() -> int:
                 "--prefer-single-lens",
                 "FSPL",
                 "--n-live",
-                "100",
+                os.environ.get("MULTINEST_N_LIVE", "100"),
                 "--max-points",
-                "500",
+                multinest_max_points,
+                "--batch-size",
+                twinkle_batch_size,
                 "--max-iter",
-                "200000",
+                os.environ.get("MULTINEST_MAX_ITER", "200000"),
             ]
+            if os.environ.get("TWINKLE_CHECK_BATCHING", "0") == "1":
+                multinest_cmd.append("--check-batching")
+            if os.environ.get("MULTINEST_RESUME", "0") == "1":
+                multinest_cmd.append("--resume")
+            if os.environ.get("MULTINEST_NO_MULTIMODAL", "0") == "1":
+                multinest_cmd.append("--no-multimodal")
             multinest_rc = _tee_run(multinest_cmd, multinest_log, twinkle_env)
             if multinest_rc != 0:
                 print(f"Twinkle-MultiNest failed for {event} with exit code {multinest_rc}")

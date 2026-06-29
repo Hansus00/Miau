@@ -69,11 +69,65 @@ def load_lightcurve_csv(path: str | Path) -> Dict[str, np.ndarray]:
 
 
 def load_seed(path: str | Path, rank: int = 1) -> dict:
+    """Load an FSBL seed from either a CSV seed table or our best_fit.txt.
+
+    Earlier versions only accepted CSV files.  The normal stage-2 workflow,
+    however, uses ``--seed-file results/.../best_fit.txt``.  This parser accepts
+    that text format and returns the same seed keys used by ``make_prior_bounds``.
+    """
+    path = Path(path)
+    text = path.read_text(encoding="utf-8", errors="ignore")
+
+    # Native best_fit.txt format written by this script.
+    if ":" in text and "t0" in text and ("log_tE" in text or "tE" in text):
+        raw: Dict[str, float] = {}
+        for line in text.splitlines():
+            if not line.strip() or ":" not in line:
+                continue
+            key, val = line.split(":", 1)
+            key = key.strip()
+            if key == "Stats":
+                break
+            try:
+                raw[key] = _first_float(val)
+            except Exception:
+                pass
+
+        def get_pos(name, log_name=None, default=None):
+            if name in raw and np.isfinite(raw[name]) and raw[name] > 0:
+                return float(raw[name])
+            if log_name and log_name in raw and np.isfinite(raw[log_name]):
+                return float(np.exp(raw[log_name]))
+            return default
+
+        seed = {
+            "chi2": _finite_float(raw.get("chi2"), np.inf),
+            "Fs": _finite_float(raw.get("Fs"), 1.0),
+            "Fb": _finite_float(raw.get("Fb"), 0.0),
+            "t0": _finite_float(raw.get("t0"), _finite_float(raw.get("t_0"))),
+            "tE": get_pos("tE", "log_tE", 1.0),
+            "u0": _finite_float(raw.get("u0"), _finite_float(raw.get("u_0"), 0.1)),
+            "s": get_pos("s", "log_s", 1.0),
+            "q": get_pos("q", "log_q", 0.1),
+            "rho": get_pos("rho", "log_rho", 1.0e-3),
+            "alpha_deg": _finite_float(raw.get("alpha_deg"), _finite_float(raw.get("alpha"), 90.0)),
+            "seed_source": "best_fit.txt",
+        }
+        if seed["t0"] is None or seed["tE"] is None or seed["u0"] is None:
+            raise RuntimeError(f"Could not parse finite t0/tE/u0 from seed file: {path}")
+        return seed
+
+    # CSV seed table fallback.
     rows = []
-    with open(path, newline="") as f:
+    with path.open(newline="") as f:
         r = csv.DictReader(f)
         for row in r:
-            rows.append({k: float(v) for k, v in row.items() if k != "rank"})
+            parsed = {}
+            for k, v in row.items():
+                if k == "rank" or v is None or str(v).strip() == "":
+                    continue
+                parsed[k] = float(v)
+            rows.append(parsed)
     if not rows:
         raise RuntimeError(f"No rows in seed file: {path}")
     rows = sorted(rows, key=lambda x: x.get("chi2", np.inf))
@@ -116,6 +170,34 @@ def load_model_params_file(path: str | Path) -> Dict[str, Dict[str, float]]:
     return sections
 
 
+def _finite_positive(x, default: float | None = None) -> float | None:
+    try:
+        y = float(x)
+    except Exception:
+        return default
+    if not np.isfinite(y) or y <= 0.0:
+        return default
+    return y
+
+
+def _finite_float(x, default: float | None = None) -> float | None:
+    try:
+        y = float(x)
+    except Exception:
+        return default
+    if not np.isfinite(y):
+        return default
+    return y
+
+
+def _valid_single_lens_seed(section: dict) -> bool:
+    return (
+        _finite_float(section.get("t_0")) is not None
+        and _finite_positive(section.get("t_E")) is not None
+        and _finite_float(section.get("u_0")) is not None
+    )
+
+
 def seed_from_pspl_fspl(params_file: str | Path, prefer: str = "FSPL") -> dict:
     """
     Construct an FSBL seed from PSPL/FSPL results.
@@ -123,40 +205,50 @@ def seed_from_pspl_fspl(params_file: str | Path, prefer: str = "FSPL") -> dict:
     PSPL/FSPL constrain t0, tE, u0 and, for FSPL, rho. They do not constrain
     binary-lens topology, so s, q, alpha are broad default centers used only to
     build broad priors.
+
+    Important robustness detail: do not use an FSPL section just because it
+    exists. Short/failed events can write NaN parameters. In that case this
+    function falls back to the first finite PSPL/FSPL seed instead of producing
+    NaN prior bounds for MultiNest.
     """
     sections = load_model_params_file(params_file)
     prefer = prefer.upper()
 
+    candidates = []
+    if prefer in {"PSPL", "FSPL"}:
+        candidates.append(prefer)
+    candidates.extend(["FSPL", "PSPL"])
+
     base_name = None
-    if prefer == "FSPL" and "FSPL" in sections:
-        base_name = "FSPL"
-    elif "PSPL" in sections:
-        base_name = "PSPL"
-    elif "FSPL" in sections:
-        base_name = "FSPL"
-    else:
-        raise RuntimeError(f"No PSPL/FSPL section found in params file: {params_file}")
+    for name in candidates:
+        if name in sections and _valid_single_lens_seed(sections[name]):
+            base_name = name
+            break
+    if base_name is None:
+        raise RuntimeError(f"No finite PSPL/FSPL seed found in params file: {params_file}")
 
     base = sections[base_name]
-    pspl = sections.get("PSPL", {})
     fspl = sections.get("FSPL", {})
 
-    t0 = float(base.get("t_0", pspl.get("t_0", fspl.get("t_0"))))
-    tE = float(base.get("t_E", pspl.get("t_E", fspl.get("t_E"))))
-    u0 = float(base.get("u_0", pspl.get("u_0", fspl.get("u_0", 0.1))))
-    rho = float(fspl.get("rho", 1.0e-3))
-    rho = min(max(rho, 1.0e-5), 0.1)
+    t0 = _finite_float(base.get("t_0"))
+    tE = _finite_positive(base.get("t_E"))
+    u0 = _finite_float(base.get("u_0"), 0.1)
+    if t0 is None or tE is None or u0 is None:
+        raise RuntimeError(f"Internal error: selected non-finite seed {base_name} from {params_file}")
+
+    rho = _finite_positive(fspl.get("rho"), 1.0e-3)
+    rho = min(max(float(rho), 1.0e-5), 0.1)
 
     return {
-        "chi2": float(base.get("Chi2", np.inf)),
-        "Fs": float(base.get("Fs", 1.0)),
-        "Fb": float(base.get("Fb", 0.0)),
-        "t0": t0,
-        "tE": max(tE, 1.0e-3),
-        "u0": u0,
+        "chi2": _finite_float(base.get("Chi2"), np.inf),
+        "Fs": _finite_float(base.get("Fs"), 1.0),
+        "Fb": _finite_float(base.get("Fb"), 0.0),
+        "t0": float(t0),
+        "tE": max(float(tE), 1.0e-3),
+        "u0": float(u0),
         "s": float(os.environ.get("MN_INIT_S", "1.0")),
         "q": float(os.environ.get("MN_INIT_Q", "0.1")),
-        "rho": rho,
+        "rho": float(rho),
         "alpha_deg": float(os.environ.get("MN_INIT_ALPHA_DEG", "90.0")),
         "seed_source": base_name,
     }
@@ -218,6 +310,161 @@ def make_fsbl_mag_twinkle(engine, t: np.ndarray):
     return fsbl_mag_twinkle
 
 
+def make_fsbl_mag_twinkle_batched(
+    twinkle,
+    t: np.ndarray,
+    *,
+    batch_size: int,
+    device_num: int = 0,
+    n_stream: int = 1,
+    reltol: float = 1e-4,
+    astrometry: bool = False,
+):
+    """Return a Twinkle magnification function that evaluates points in batches.
+
+    This keeps the likelihood on many selected points, e.g. 15000, but never
+    creates a single huge Twinkle engine.  Instead it reuses one engine per
+    batch length, normally one engine for ``batch_size`` and one for the final
+    shorter batch.
+    """
+    t = np.asarray(t, dtype=np.float64)
+    n_points = len(t)
+    batch_size = int(batch_size)
+    if batch_size <= 0 or batch_size >= n_points:
+        engine = make_twinkle_engine(
+            twinkle,
+            n_srcs=n_points,
+            device_num=device_num,
+            n_stream=n_stream,
+            reltol=reltol,
+            astrometry=astrometry,
+        )
+        return make_fsbl_mag_twinkle(engine, t), {
+            "batch_size": n_points,
+            "n_batches": 1,
+            "unique_engine_sizes": [n_points],
+        }
+
+    slices = [slice(i, min(i + batch_size, n_points)) for i in range(0, n_points, batch_size)]
+    engines: Dict[int, object] = {}
+    mag_buffers: Dict[int, np.ndarray] = {}
+    out = np.empty(n_points, dtype=np.float64)
+
+    def _get_engine(n_srcs: int):
+        if n_srcs not in engines:
+            engines[n_srcs] = make_twinkle_engine(
+                twinkle,
+                n_srcs=n_srcs,
+                device_num=device_num,
+                n_stream=n_stream,
+                reltol=reltol,
+                astrometry=astrometry,
+            )
+            mag_buffers[n_srcs] = np.empty(n_srcs, dtype=np.float64)
+        return engines[n_srcs], mag_buffers[n_srcs]
+
+    def fsbl_mag_twinkle_batched(theta: np.ndarray) -> np.ndarray:
+        t0, log_tE, u0, log_s, log_q, log_rho, alpha_deg = theta
+        tE = float(np.exp(log_tE))
+        s = float(np.exp(log_s))
+        q = float(np.exp(log_q))
+        rho = float(np.exp(log_rho))
+        x, y = trajectory_xy(t, float(t0), tE, float(u0), float(alpha_deg))
+        for sl in slices:
+            n_srcs = sl.stop - sl.start
+            engine, mag = _get_engine(n_srcs)
+            engine.set_params(s, q, rho, x[sl], y[sl])
+            engine.run()
+            engine.return_mag_to(mag)
+            out[sl] = mag
+        return out
+
+    info = {
+        "batch_size": int(batch_size),
+        "n_batches": len(slices),
+        "unique_engine_sizes": sorted({sl.stop - sl.start for sl in slices}),
+    }
+    return fsbl_mag_twinkle_batched, info
+
+
+def _uniform_fill_indices(t: np.ndarray, already: np.ndarray, max_points: int) -> np.ndarray:
+    """Fill a selected index set with uniform-in-time points up to max_points."""
+    already = np.unique(np.asarray(already, dtype=int))
+    if len(already) >= max_points:
+        return already[:max_points]
+    all_idx = np.arange(len(t), dtype=int)
+    remaining = np.setdiff1d(all_idx, already, assume_unique=False)
+    need = int(max_points) - len(already)
+    if need <= 0 or len(remaining) == 0:
+        return already
+    rem = remaining[np.argsort(t[remaining])]
+    take = np.linspace(0, len(rem) - 1, min(need, len(rem)), dtype=int)
+    return np.unique(np.concatenate([already, rem[take]]))
+
+
+def select_multinest_subset(lc: Dict[str, np.ndarray], max_points: int, *, use_focus: bool = True) -> Tuple[Dict[str, np.ndarray], Dict[str, object]]:
+    """Select up to max_points for FSBL search without uniform thinning.
+
+    If focus selection is available, protect points near the signal/anomaly and
+    then fill the rest uniformly in time.  This is much safer than the old
+    ``np.linspace`` thinning, which could miss short anomalies completely.
+    """
+    n_full = len(lc["t"])
+    if not max_points or max_points <= 0 or n_full <= max_points:
+        return lc, {"method": "full", "n_input": int(n_full), "n_selected": int(n_full)}
+
+    t = np.asarray(lc["t"], dtype=float)
+    flux = np.asarray(lc["flux"], dtype=float)
+    flux_err = np.asarray(lc["flux_err"], dtype=float)
+
+    idx = None
+    meta: Dict[str, object] = {"method": "focus_plus_uniform_fill"}
+
+    if use_focus:
+        try:
+            from event_focus import FocusConfig, select_focus_indices
+
+            # For large budgets such as 15000, the old FocusConfig defaults
+            # (360+100+52) are too small.  Unless the user explicitly sets the
+            # split, scale the focus allocation with max_points.
+            cfg = FocusConfig.from_env("TWINKLE_FOCUS_")
+            cfg.max_points = int(max_points)
+            if "TWINKLE_FOCUS_PEAK_POINTS" not in os.environ:
+                cfg.peak_points = int(0.70 * max_points)
+            if "TWINKLE_FOCUS_UNIFORM_POINTS" not in os.environ:
+                cfg.uniform_points = int(0.20 * max_points)
+            if "TWINKLE_FOCUS_BASELINE_POINTS" not in os.environ:
+                cfg.baseline_points = max(0, int(max_points) - cfg.peak_points - cfg.uniform_points)
+            idx, focus_meta = select_focus_indices(t, flux, flux_err, cfg)
+            meta.update({f"focus_{k}": v for k, v in focus_meta.items()})
+        except Exception as exc:
+            idx = None
+            meta["focus_error"] = repr(exc)
+
+    if idx is None or len(idx) == 0:
+        # Fallback that uses largest brightness, not uniform thinning.
+        baseline = float(np.nanmedian(flux))
+        signal = flux - baseline
+        n_peak = min(int(0.75 * max_points), n_full)
+        strongest = np.argsort(signal)[::-1][:n_peak]
+        idx = strongest
+        meta["method"] = "brightest_plus_uniform_fill"
+        meta["baseline_flux"] = baseline
+
+    idx = _uniform_fill_indices(t, np.asarray(idx, dtype=int), int(max_points))
+    idx = idx[np.argsort(t[idx])]
+    sub = {k: np.asarray(v)[idx] for k, v in lc.items()}
+    meta.update(
+        {
+            "n_input": int(n_full),
+            "n_selected": int(len(idx)),
+            "indices_min": int(idx.min()) if len(idx) else -1,
+            "indices_max": int(idx.max()) if len(idx) else -1,
+        }
+    )
+    return sub, meta
+
+
 def make_prior_bounds(seed: dict, t: np.ndarray, broad_binary: bool = False) -> np.ndarray:
     t_span = max(float(np.nanmax(t) - np.nanmin(t)), 1.0)
     tE = max(seed["tE"], 1e-3)
@@ -262,6 +509,71 @@ def make_prior_bounds(seed: dict, t: np.ndarray, broad_binary: bool = False) -> 
     return bounds
 
 
+def _remove_old_multinest_outputs(out_dir: Path) -> None:
+    """Remove stale PyMultiNest files before a fresh run.
+
+    MultiNest can resume from old ``mn_*`` files. That is dangerous while
+    changing max_points, batching, priors, or focus selection because the old
+    samples were generated for a different likelihood.
+    """
+    for p in out_dir.glob("mn_*"):
+        if p.is_file():
+            p.unlink()
+    for name in ["best_fit.txt", "seed_used.txt"]:
+        p = out_dir / name
+        if p.exists() and p.is_file():
+            p.unlink()
+
+
+def _theta_from_seed(seed: dict) -> np.ndarray:
+    return np.asarray(
+        [
+            seed["t0"],
+            np.log(max(seed["tE"], 1.0e-6)),
+            seed["u0"],
+            np.log(max(seed.get("s", 1.0), 1.0e-6)),
+            np.log(max(seed.get("q", 0.1), 1.0e-8)),
+            np.log(max(seed.get("rho", 1.0e-3), 1.0e-8)),
+            seed.get("alpha_deg", 90.0),
+        ],
+        dtype=float,
+    )
+
+
+def check_batching_consistency(twinkle, t: np.ndarray, seed: dict, *, device_num: int, n_stream: int, reltol: float, astrometry: bool) -> None:
+    """Quick sanity check that batched and unbatched Twinkle agree.
+
+    This uses only a small prefix of the selected light curve, so it should not
+    be expensive. It verifies the batching wrapper, not the scientific fit.
+    """
+    n = min(512, len(t))
+    if n < 4:
+        print("Batching check skipped: too few points.", flush=True)
+        return
+    t_check = np.asarray(t[:n], dtype=np.float64)
+    theta = _theta_from_seed(seed)
+    single_engine = make_twinkle_engine(twinkle, n, device_num=device_num, n_stream=n_stream, reltol=reltol, astrometry=astrometry)
+    mag_single = make_fsbl_mag_twinkle(single_engine, t_check)(theta).copy()
+    mag_batch, info = make_fsbl_mag_twinkle_batched(
+        twinkle,
+        t_check,
+        batch_size=max(1, min(128, n // 2)),
+        device_num=device_num,
+        n_stream=n_stream,
+        reltol=reltol,
+        astrometry=astrometry,
+    )
+    mag_batched = mag_batch(theta).copy()
+    diff = np.nanmax(np.abs(mag_single - mag_batched))
+    rel = diff / max(np.nanmax(np.abs(mag_single)), 1.0)
+    print(
+        f"Batching self-check: n={n}, info={info}, max_abs_diff={diff:.3e}, rel={rel:.3e}",
+        flush=True,
+    )
+    if not np.isfinite(diff) or rel > 1.0e-7:
+        raise RuntimeError("Batched Twinkle magnification does not match single-engine magnification.")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-file", required=True)
@@ -274,6 +586,22 @@ def main():
     parser.add_argument("--evidence-tolerance", type=float, default=float(os.environ.get("MULTINEST_EVIDENCE_TOL", "0.5")))
     parser.add_argument("--sampling-efficiency", type=float, default=float(os.environ.get("MULTINEST_SAMPLING_EFF", "0.3")))
     parser.add_argument("--max-points", type=int, default=int(os.environ.get("MULTINEST_MAX_POINTS", "0")))
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=int(os.environ.get("TWINKLE_BATCH_SIZE", os.environ.get("MULTINEST_BATCH_SIZE", "2048"))),
+        help="Evaluate Twinkle likelihood in batches of this many points; 0 disables batching.",
+    )
+    parser.add_argument(
+        "--no-focus-selection",
+        action="store_true",
+        help="Disable event_focus selection; if --max-points is used, fall back to brightest+uniform fill.",
+    )
+    parser.add_argument("--resume", action="store_true", help="Resume an existing MultiNest run. Default is a fresh run that removes stale mn_* files.")
+    parser.add_argument("--no-multimodal", action="store_true", help="Disable MultiNest multimodal mode. Default keeps multimodal mode on.")
+    parser.add_argument("--n-clustering-params", type=int, default=int(os.environ.get("MULTINEST_N_CLUSTERING_PARAMS", "7")), help="Number of parameters used for MultiNest clustering; 7 means all FSBL parameters.")
+    parser.add_argument("--mode-tolerance", type=float, default=float(os.environ.get("MULTINEST_MODE_TOL", "-1e90")), help="MultiNest mode_tolerance passed through to PyMultiNest.")
+    parser.add_argument("--check-batching", action="store_true", help="Before MultiNest, compare batched vs unbatched Twinkle magnification on a small sample.")
     parser.add_argument("--max-iter", type=int, default=200000, help="Maximum number of MultiNest iterations/samples")
     parser.add_argument("--twinkle-device", type=int, default=int(os.environ.get("TWINKLE_DEVICE", "0")))
     parser.add_argument("--twinkle-n-stream", type=int, default=int(os.environ.get("TWINKLE_N_STREAM", "1")))
@@ -289,11 +617,20 @@ def main():
             "Install PyMultiNest/MultiNest first."
         ) from exc
 
-    lc = load_lightcurve_csv(args.data_file)
-    if args.max_points and len(lc["t"]) > args.max_points:
-        # Deterministic thinning over time for fast posterior/smoke tests.
-        take = np.linspace(0, len(lc["t"]) - 1, args.max_points, dtype=int)
-        lc = {k: v[take] for k, v in lc.items()}
+    lc_full = load_lightcurve_csv(args.data_file)
+    lc, selection_meta = select_multinest_subset(
+        lc_full,
+        int(args.max_points),
+        use_focus=not bool(args.no_focus_selection),
+    )
+    if selection_meta.get("method") != "full":
+        print(
+            "Point selection for MultiNest FSBL: "
+            f"method={selection_meta.get('method')}, "
+            f"input={selection_meta.get('n_input')}, "
+            f"selected={selection_meta.get('n_selected')}",
+            flush=True,
+        )
 
     if args.seed_file is not None:
         seed = load_seed(args.seed_file, args.rank)
@@ -311,18 +648,29 @@ def main():
     e = lc["flux_err"]
 
     twinkle = import_twinkle_module()
-    engine = make_twinkle_engine(
+    if args.check_batching:
+        check_batching_consistency(
+            twinkle,
+            t,
+            seed,
+            device_num=args.twinkle_device,
+            n_stream=args.twinkle_n_stream,
+            reltol=args.twinkle_reltol,
+            astrometry=args.twinkle_astrometry,
+        )
+    fsbl_mag, batch_info = make_fsbl_mag_twinkle_batched(
         twinkle,
-        n_srcs=len(t),
+        t,
+        batch_size=int(args.batch_size),
         device_num=args.twinkle_device,
         n_stream=args.twinkle_n_stream,
         reltol=args.twinkle_reltol,
         astrometry=args.twinkle_astrometry,
     )
-    fsbl_mag = make_fsbl_mag_twinkle(engine, t)
     print(
         f"Using Twinkle MultiNest likelihood: points={len(t)}, device={args.twinkle_device}, "
-        f"reltol={args.twinkle_reltol}, n_live={args.n_live}",
+        f"reltol={args.twinkle_reltol}, n_live={args.n_live}, "
+        f"batch_size={batch_info.get('batch_size')}, n_batches={batch_info.get('n_batches')}",
         flush=True,
     )
 
@@ -348,6 +696,8 @@ def main():
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    if not args.resume:
+        _remove_old_multinest_outputs(out_dir)
     basename = str(out_dir / "mn_")
     names = ["t0", "log_tE", "u0", "log_s", "log_q", "log_rho", "alpha_deg"]
     with open(out_dir / "seed_used.txt", "w") as f:
@@ -355,7 +705,14 @@ def main():
         f.write(f"twinkle_python_dir: {os.environ.get('TWINKLE_PYTHON_DIR', '')}\n")
         f.write(f"twinkle_device: {args.twinkle_device}\n")
         f.write(f"twinkle_reltol: {args.twinkle_reltol}\n")
-        f.write(f"n_points: {len(t)}\n\n")
+        f.write(f"n_points: {len(t)}\n")
+        f.write(f"n_points_full: {len(lc_full['t'])}\n")
+        f.write(f"selection_meta: {selection_meta}\n")
+        f.write(f"batch_info: {batch_info}\n")
+        f.write(f"resume: {args.resume}\n")
+        f.write(f"multimodal: {not args.no_multimodal}\n")
+        f.write(f"n_clustering_params: {args.n_clustering_params}\n")
+        f.write("wrapped_params: alpha_deg\n\n")
         for k, v in seed.items():
             f.write(f"{k}: {v}\n")
         f.write("\nBounds:\n")
@@ -367,21 +724,46 @@ def main():
         prior,
         ndim,
         outputfiles_basename=basename,
-        resume=True,
+        resume=bool(args.resume),
         verbose=True,
         n_live_points=args.n_live,
         evidence_tolerance=args.evidence_tolerance,
         sampling_efficiency=args.sampling_efficiency,
         max_iter=args.max_iter,
+        multimodal=not bool(args.no_multimodal),
+        n_clustering_params=max(1, min(int(args.n_clustering_params), ndim)),
+        wrapped_params=[6],
+        mode_tolerance=float(args.mode_tolerance),
     )
 
     analyzer = pymultinest.Analyzer(n_params=ndim, outputfiles_basename=basename)
     stats = analyzer.get_stats()
     best = analyzer.get_best_fit()["parameters"]
-    A = fsbl_mag(np.asarray(best, dtype=float))
-    Fs, Fb, chi2 = weighted_linear_fit(A, y, e)
+
+    # Search chi2 is computed on the selected subset used by MultiNest.
+    # For submission/AIC comparisons against PSPL/FSPL, recompute the final
+    # best-fit fluxes and chi2 on the FULL light curve.  Otherwise FSBL would
+    # be compared using e.g. 8000 points while simple models use all 46208.
+    A_search = fsbl_mag(np.asarray(best, dtype=float))
+    Fs_search, Fb_search, chi2_search = weighted_linear_fit(A_search, y, e)
+
+    full_mag, full_batch_info = make_fsbl_mag_twinkle_batched(
+        twinkle,
+        lc_full["t"],
+        batch_size=int(os.environ.get("TWINKLE_FULL_BATCH_SIZE", args.batch_size)),
+        device_num=args.twinkle_device,
+        n_stream=args.twinkle_n_stream,
+        reltol=args.twinkle_reltol,
+        astrometry=args.twinkle_astrometry,
+    )
+    A_full = full_mag(np.asarray(best, dtype=float))
+    Fs, Fb, chi2 = weighted_linear_fit(A_full, lc_full["flux"], lc_full["flux_err"])
+
     with open(out_dir / "best_fit.txt", "w") as f:
         f.write(f"chi2: {chi2}\nFs: {Fs}\nFb: {Fb}\n")
+        f.write(f"search_chi2: {chi2_search}\nsearch_Fs: {Fs_search}\nsearch_Fb: {Fb_search}\n")
+        f.write(f"eval_n_points: {len(lc_full['t'])}\nsearch_n_points: {len(t)}\n")
+        f.write(f"full_batch_info: {full_batch_info}\n")
         for name, val in zip(names, best):
             f.write(f"{name}: {val}\n")
         f.write(f"tE: {np.exp(best[1])}\n")

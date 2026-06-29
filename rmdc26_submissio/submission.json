@@ -1,7 +1,17 @@
 {
-  "team_name": "microlensing-innovation-aleje-ujazdowskie",
+  "team_name": "microlensing-innovation-aleje-ujazdowski",
   "tier": "beginner",
-  "hardware_info": null,
-  "repo_url": "https://github.com/Hansus00/Miau",
+  "hardware_info": {
+    "platform": "Linux-6.18.33.1-microsoft-standard-WSL2-x86_64-with-glibc2.42",
+    "os": "Linux",
+    "cpu_details": "Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz",
+    "memory_gb": 30.36,
+    "gpu": {
+      "model": "NVIDIA Titan V",
+      "count": 1,
+      "memory_gb": 12
+    }
+  },
+  "repo_url": "git@github.com:Hansus00/Miau.git",
   "git_dir": null
 }
