@@ -387,83 +387,92 @@ def make_fsbl_mag_twinkle_batched(
     return fsbl_mag_twinkle_batched, info
 
 
-def _uniform_fill_indices(t: np.ndarray, already: np.ndarray, max_points: int) -> np.ndarray:
-    """Fill a selected index set with uniform-in-time points up to max_points."""
-    already = np.unique(np.asarray(already, dtype=int))
-    if len(already) >= max_points:
-        return already[:max_points]
-    all_idx = np.arange(len(t), dtype=int)
-    remaining = np.setdiff1d(all_idx, already, assume_unique=False)
-    need = int(max_points) - len(already)
-    if need <= 0 or len(remaining) == 0:
-        return already
-    rem = remaining[np.argsort(t[remaining])]
-    take = np.linspace(0, len(rem) - 1, min(need, len(rem)), dtype=int)
-    return np.unique(np.concatenate([already, rem[take]]))
+def _pspl_window_indices(lc: Dict[str, np.ndarray]) -> Tuple[np.ndarray, Dict[str, object]]:
+    """Use the same time-window logic as PSPL/FSPL in source/run.py.
 
-
-def select_multinest_subset(lc: Dict[str, np.ndarray], max_points: int, *, use_focus: bool = True) -> Tuple[Dict[str, np.ndarray], Dict[str, object]]:
-    """Select up to max_points for FSBL search without uniform thinning.
-
-    If focus selection is available, protect points near the signal/anomaly and
-    then fill the rest uniformly in time.  This is much safer than the old
-    ``np.linspace`` thinning, which could miss short anomalies completely.
+    The pipeline PSPL stage constructs InitialConditions(data) and then fits
+    only points satisfying start_boundary <= t <= end_boundary.  This helper
+    imports and calls the same InitialConditions class.  Therefore, if you
+    change the PSPL crop logic in source/initial_conditions.py, MultiNest FSBL
+    gets the same crop automatically.
     """
-    n_full = len(lc["t"])
-    if not max_points or max_points <= 0 or n_full <= max_points:
-        return lc, {"method": "full", "n_input": int(n_full), "n_selected": int(n_full)}
+    try:
+        import jax.numpy as jnp
+        from initial_conditions import InitialConditions
+
+        data = {
+            "t": jnp.asarray(lc["t"], dtype=jnp.float64),
+            # In the main pipeline this key is called "mag", but it is already
+            # flux.  Use the same convention here.
+            "mag": jnp.asarray(lc["flux"], dtype=jnp.float64),
+            "mag_err": jnp.asarray(lc["flux_err"], dtype=jnp.float64),
+        }
+        init = InitialConditions(data)
+        start = float(init.start_boundary)
+        end = float(init.end_boundary)
+        peak = float(init.main_peak_time)
+        baseline = float(init.baseline)
+        meta: Dict[str, object] = {}
+    except Exception as exc:
+        # Last-resort fallback: do not crash if this file is run standalone.
+        t = np.asarray(lc["t"], dtype=float)
+        flux = np.asarray(lc["flux"], dtype=float)
+        peak = float(t[int(np.nanargmax(flux))])
+        start = peak - 10.0
+        end = peak + 10.0
+        baseline = float(np.nanmedian(flux))
+        meta = {"pspl_window_error": repr(exc)}
 
     t = np.asarray(lc["t"], dtype=float)
-    flux = np.asarray(lc["flux"], dtype=float)
-    flux_err = np.asarray(lc["flux_err"], dtype=float)
+    idx = np.where(np.isfinite(t) & (t >= start) & (t <= end))[0]
 
-    idx = None
-    meta: Dict[str, object] = {"method": "focus_plus_uniform_fill"}
+    # Safety fallback for extremely short/pathological events.
+    if len(idx) == 0:
+        flux = np.asarray(lc["flux"], dtype=float)
+        peak = float(t[int(np.nanargmax(flux))])
+        start = max(float(np.nanmin(t)), peak - 10.0)
+        end = min(float(np.nanmax(t)), peak + 10.0)
+        idx = np.where(np.isfinite(t) & (t >= start) & (t <= end))[0]
+        meta["pspl_window_empty_fallback"] = True
 
-    if use_focus:
-        try:
-            from event_focus import FocusConfig, select_focus_indices
+    meta.update(
+        {
+            "pspl_start_boundary": start,
+            "pspl_end_boundary": end,
+            "pspl_main_peak_time": peak,
+            "pspl_baseline": baseline,
+            "pspl_window_points": int(len(idx)),
+        }
+    )
+    return idx[np.argsort(t[idx])], meta
 
-            # For large budgets such as 15000, the old FocusConfig defaults
-            # (360+100+52) are too small.  Unless the user explicitly sets the
-            # split, scale the focus allocation with max_points.
-            cfg = FocusConfig.from_env("TWINKLE_FOCUS_")
-            cfg.max_points = int(max_points)
-            if "TWINKLE_FOCUS_PEAK_POINTS" not in os.environ:
-                cfg.peak_points = int(0.70 * max_points)
-            if "TWINKLE_FOCUS_UNIFORM_POINTS" not in os.environ:
-                cfg.uniform_points = int(0.20 * max_points)
-            if "TWINKLE_FOCUS_BASELINE_POINTS" not in os.environ:
-                cfg.baseline_points = max(0, int(max_points) - cfg.peak_points - cfg.uniform_points)
-            idx, focus_meta = select_focus_indices(t, flux, flux_err, cfg)
-            meta.update({f"focus_{k}": v for k, v in focus_meta.items()})
-        except Exception as exc:
-            idx = None
-            meta["focus_error"] = repr(exc)
 
-    if idx is None or len(idx) == 0:
-        # Fallback that uses largest brightness, not uniform thinning.
-        baseline = float(np.nanmedian(flux))
-        signal = flux - baseline
-        n_peak = min(int(0.75 * max_points), n_full)
-        strongest = np.argsort(signal)[::-1][:n_peak]
-        idx = strongest
-        meta["method"] = "brightest_plus_uniform_fill"
-        meta["baseline_flux"] = baseline
+def select_multinest_subset(lc: Dict[str, np.ndarray]) -> Tuple[Dict[str, np.ndarray], Dict[str, object]]:
+    """Select exactly the same time window as PSPL/FSPL, with no thinning.
 
-    idx = _uniform_fill_indices(t, np.asarray(idx, dtype=int), int(max_points))
-    idx = idx[np.argsort(t[idx])]
+    This intentionally has no ``max_points`` cap, no uniform fill/cap, and no
+    event_focus mode.  The only point selection is the PSPL/FSPL
+    InitialConditions time window from source/initial_conditions.py.
+    """
+    n_full = len(lc["t"])
+    t = np.asarray(lc["t"], dtype=float)
+
+    idx, meta = _pspl_window_indices(lc)
+    idx = np.asarray(idx, dtype=int)
+
     sub = {k: np.asarray(v)[idx] for k, v in lc.items()}
     meta.update(
         {
+            "method": "pspl_window_no_thinning",
             "n_input": int(n_full),
             "n_selected": int(len(idx)),
-            "indices_min": int(idx.min()) if len(idx) else -1,
-            "indices_max": int(idx.max()) if len(idx) else -1,
+            "thinning": False,
+            "max_points_cap": None,
+            "selected_t_min": float(np.nanmin(t[idx])) if len(idx) else None,
+            "selected_t_max": float(np.nanmax(t[idx])) if len(idx) else None,
         }
     )
     return sub, meta
-
 
 def make_prior_bounds(seed: dict, t: np.ndarray, broad_binary: bool = False) -> np.ndarray:
     t_span = max(float(np.nanmax(t) - np.nanmin(t)), 1.0)
@@ -513,8 +522,8 @@ def _remove_old_multinest_outputs(out_dir: Path) -> None:
     """Remove stale PyMultiNest files before a fresh run.
 
     MultiNest can resume from old ``mn_*`` files. That is dangerous while
-    changing max_points, batching, priors, or focus selection because the old
-    samples were generated for a different likelihood.
+    changing batching or priors because the old samples were generated for a
+    different likelihood.
     """
     for p in out_dir.glob("mn_*"):
         if p.is_file():
@@ -585,17 +594,14 @@ def main():
     parser.add_argument("--n-live", type=int, default=int(os.environ.get("MULTINEST_N_LIVE", "300")))
     parser.add_argument("--evidence-tolerance", type=float, default=float(os.environ.get("MULTINEST_EVIDENCE_TOL", "0.5")))
     parser.add_argument("--sampling-efficiency", type=float, default=float(os.environ.get("MULTINEST_SAMPLING_EFF", "0.3")))
-    parser.add_argument("--max-points", type=int, default=int(os.environ.get("MULTINEST_MAX_POINTS", "0")))
     parser.add_argument(
         "--batch-size",
         type=int,
         default=int(os.environ.get("TWINKLE_BATCH_SIZE", os.environ.get("MULTINEST_BATCH_SIZE", "2048"))),
-        help="Evaluate Twinkle likelihood in batches of this many points; 0 disables batching.",
-    )
-    parser.add_argument(
-        "--no-focus-selection",
-        action="store_true",
-        help="Disable event_focus selection; if --max-points is used, fall back to brightest+uniform fill.",
+        help=(
+            "Evaluate Twinkle likelihood in batches of this many points; 0 disables batching. "
+            "This is not point thinning: all points from the PSPL/FSPL window are still used."
+        ),
     )
     parser.add_argument("--resume", action="store_true", help="Resume an existing MultiNest run. Default is a fresh run that removes stale mn_* files.")
     parser.add_argument("--no-multimodal", action="store_true", help="Disable MultiNest multimodal mode. Default keeps multimodal mode on.")
@@ -618,11 +624,7 @@ def main():
         ) from exc
 
     lc_full = load_lightcurve_csv(args.data_file)
-    lc, selection_meta = select_multinest_subset(
-        lc_full,
-        int(args.max_points),
-        use_focus=not bool(args.no_focus_selection),
-    )
+    lc, selection_meta = select_multinest_subset(lc_full)
     if selection_meta.get("method") != "full":
         print(
             "Point selection for MultiNest FSBL: "
@@ -707,6 +709,7 @@ def main():
         f.write(f"twinkle_reltol: {args.twinkle_reltol}\n")
         f.write(f"n_points: {len(t)}\n")
         f.write(f"n_points_full: {len(lc_full['t'])}\n")
+        f.write("selection_mode: pspl-window-no-thinning\n")
         f.write(f"selection_meta: {selection_meta}\n")
         f.write(f"batch_info: {batch_info}\n")
         f.write(f"resume: {args.resume}\n")

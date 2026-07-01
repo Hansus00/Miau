@@ -142,13 +142,12 @@ def main() -> int:
                     "MN_U0_MIN": "0",
                     "MN_U0_MAX": "4",
                     "TWINKLE_PYTHON_DIR": os.environ.get("TWINKLE_PYTHON_DIR", str(Path.home() / "Twinkle" / "python")),
-                    # Large FSBL budget: no more 500-point uniform thinning.
-                    # The likelihood is evaluated in Twinkle batches by multinest_twinkle.py.
-                    "MULTINEST_FSBL_MAX_POINTS": os.environ.get("MULTINEST_FSBL_MAX_POINTS", "15000"),
-                    "TWINKLE_BATCH_SIZE": os.environ.get("TWINKLE_BATCH_SIZE", "2048"),
+                    # No point thinning here: multinest_twinkle.py uses all points
+                    # from the same InitialConditions time window as PSPL/FSPL.
+                    # TWINKLE_BATCH_SIZE only controls memory usage.
+                    "TWINKLE_BATCH_SIZE": os.environ.get("TWINKLE_BATCH_SIZE", "512"),
                 }
             )
-            multinest_max_points = twinkle_env["MULTINEST_FSBL_MAX_POINTS"]
             twinkle_batch_size = twinkle_env["TWINKLE_BATCH_SIZE"]
             multinest_cmd = [
                 sys.executable,
@@ -163,8 +162,6 @@ def main() -> int:
                 "FSPL",
                 "--n-live",
                 os.environ.get("MULTINEST_N_LIVE", "100"),
-                "--max-points",
-                multinest_max_points,
                 "--batch-size",
                 twinkle_batch_size,
                 "--max-iter",
