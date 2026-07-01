@@ -24,7 +24,9 @@ class InitialConditions:
 
     def _compute_ic_stats(self, t, mag, mag_err):
         baseline = jnp.median(mag)
-        main_peak_time = jnp.mean(t[jnp.argsort(mag)[-10:]])
+
+        peak_idx = jnp.argmax(mag)
+        main_peak_time = t[peak_idx]
 
         above_threshold = (mag > baseline + self.threshold * mag_err).astype(jnp.int32)
         consecutive = jax.lax.reduce_window(
@@ -41,10 +43,26 @@ class InitialConditions:
         first_idx = jnp.argmax(mask)
         last_idx = (len(mask) - 1) - jnp.argmax(mask[::-1])
 
-        start_idx = jnp.where(any_valid, first_idx, 0)
-        end_idx = jnp.where(any_valid, last_idx + self.window_size - 1, len(t) - 1)
+        detected_start_idx = first_idx
+        detected_end_idx = last_idx + self.window_size - 1
 
-        return baseline, main_peak_time, t[start_idx], t[end_idx]
+        fallback_start_time = main_peak_time - 10.0
+        fallback_end_time = main_peak_time + 10.0
+
+        detected_start_time = t[jnp.clip(detected_start_idx, 0, len(t) - 1)]
+        detected_end_time = t[jnp.clip(detected_end_idx, 0, len(t) - 1)]
+
+        start_boundary = jnp.where(any_valid, detected_start_time, fallback_start_time)
+        end_boundary = jnp.where(any_valid, detected_end_time, fallback_end_time)
+
+        start_boundary = jnp.maximum(start_boundary, t[0])
+        end_boundary = jnp.minimum(end_boundary, t[-1])
+
+        bad_window = end_boundary <= start_boundary
+        start_boundary = jnp.where(bad_window, jnp.maximum(main_peak_time - 10.0, t[0]), start_boundary)
+        end_boundary = jnp.where(bad_window, jnp.minimum(main_peak_time + 10.0, t[-1]), end_boundary)
+
+        return baseline, main_peak_time, start_boundary, end_boundary
 
     def get_processed_data(self, max_len):
         """Returns data augmented with initial conditions and padded to max_len."""
